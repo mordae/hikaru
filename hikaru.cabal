@@ -1,0 +1,61 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 3f6987dad8453f38f554917a82b846a8e83799e9a36b3c5ab8035db2ff53715d
+
+name:           hikaru
+version:        0.1.0.0
+synopsis:       Haskell web micro framework
+description:    Hikaru (light in Japanese, also first name of helmsman Sulu of the Enterprise)
+                is a micro framework for web applications. It provides applicative routing,
+                content negotiation and a customizable action monad.
+category:       Web
+homepage:       https://github.com/mordae/hikaru#readme
+bug-reports:    https://github.com/mordae/hikaru/issues
+author:         Jan Hamal Dvořák
+maintainer:     mordae@anilinux.org
+copyright:      Jan Hamal Dvořák
+license:        AGPL-3
+license-file:   LICENSE.md
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/mordae/hikaru
+
+library
+  exposed-modules:
+      Web.Hikaru
+      Web.Hikaru.Types
+      Web.Hikaru.Media
+      Web.Hikaru.Route
+      Web.Hikaru.Dispatch
+      Web.Hikaru.Action
+  other-modules:
+      Paths_hikaru
+  hs-source-dirs:
+      lib
+  default-extensions: BlockArguments DataKinds DefaultSignatures DeriveGeneric DuplicateRecordFields FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TupleSections TypeFamilies
+  ghc-options: -Wall -Wcompat
+  build-depends:
+      aeson >=1.4 && <1.5
+    , base >=4.12 && <4.13
+    , base-prelude >=1.3 && <1.4
+    , binary >=0.8 && <0.9
+    , bytestring >=0.10 && <0.11
+    , case-insensitive >=1.2 && <1.3
+    , containers >=0.6 && <0.7
+    , http-types >=0.12 && <0.13
+    , lucid >=2.9 && <2.10
+    , mtl >=2.2 && <2.3
+    , resourcet >=1.2 && <1.3
+    , string-conversions >=0.4 && <0.5
+    , text >=1.2 && <1.3
+    , text-icu >=0.7 && <0.8
+    , wai >=3.2 && <3.3
+    , wai-extra >=3.0 && <3.1
+  default-language: Haskell2010
