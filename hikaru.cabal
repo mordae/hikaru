@@ -2,14 +2,17 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3f6987dad8453f38f554917a82b846a8e83799e9a36b3c5ab8035db2ff53715d
+-- hash: 080de386f6ba22ecc810a0d7c402cafe3f478f868743a1cf4d032526533ec874
 
 name:           hikaru
 version:        0.1.0.0
 synopsis:       Haskell web micro framework
-description:    Hikaru (light in Japanese, also first name of helmsman Sulu of the Enterprise)
-                is a micro framework for web applications. It provides applicative routing,
-                content negotiation and a customizable action monad.
+description:    Hikaru is a micro framework for web applications.
+                It provides applicative routing, content negotiation
+                and a customizable action monad.
+                .
+                (It is also a Star Trek reference, which is apparently
+                a requirement for this class of software.)
 category:       Web
 homepage:       https://github.com/mordae/hikaru#readme
 bug-reports:    https://github.com/mordae/hikaru/issues

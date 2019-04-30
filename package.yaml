@@ -3,9 +3,12 @@ version: 0.1.0.0
 synopsis: Haskell web micro framework
 category: Web
 description: |
-  Hikaru (light in Japanese, also first name of helmsman Sulu of the Enterprise)
-  is a micro framework for web applications. It provides applicative routing,
-  content negotiation and a customizable action monad.
+  Hikaru is a micro framework for web applications.
+  It provides applicative routing, content negotiation
+  and a customizable action monad.
+
+  (It is also a Star Trek reference, which is apparently
+  a requirement for this class of software.)
 
 author: Jan Hamal Dvořák
 github: mordae/hikaru
