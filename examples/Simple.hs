@@ -21,6 +21,7 @@ where
   import Control.Monad.Reader
   import Data.Text (Text)
   import Lucid
+  import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import Network.Wai
   import Network.Wai.Handler.Warp
@@ -98,9 +99,14 @@ where
       -- Plug in a cool logging middleware.
       middleware $ logStdoutDev
 
-      -- Negotiate content for the root page.
-      route $ getRootHtmlR <$ get <* offerHTML
-      route $ getRootTextR <$ get <* offerText
+      -- Enable 300s cache for the static endpoints.
+      wrapAction (defaultHeader hCacheControl "public, max-age=300" >>) $ do
+        -- Negotiate content for the root page.
+        route $ getRootHtmlR <$ get <* offerHTML
+        route $ getRootTextR <$ get <* offerText
+
+      -- Disable caching for all the following endpoints.
+      wrapActions (defaultHeader hCacheControl "no-store" >>)
 
       -- Present a simple greeting page.
       route $ getHelloR <$ get <* seg "hello" <*> arg
