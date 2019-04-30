@@ -12,10 +12,18 @@ This module provides monad-based request dispatching.
 
 module Web.Hikaru.Dispatch
   ( dispatch
+
+  -- ** Routes
   , route
   , wrapRoute
+  , wrapRoutes
   , wrapAction
+  , wrapActions
+
+  -- ** Middleware
   , middleware
+
+  -- ** Error Handlers
   , handler
 
   -- * Types
@@ -165,9 +173,15 @@ where
 
 
   -- |
+  -- Wrap all /following/ routes with a route transformer.
+  --
+  wrapRoutes :: (Route r -> Route r) -> Dispatch r l ()
+  wrapRoutes wrapper = Dispatch do
+    modify \env -> env { envRouteW = envRouteW env . wrapper }
+
+
+  -- |
   -- Wrap all nested actions with an action transformer.
-  --
-  --
   --
   wrapAction :: (r -> r) -> Dispatch r Nested a -> Dispatch r l ()
   wrapAction wrapper disp = Dispatch do
@@ -175,6 +189,25 @@ where
       let env' = execState (unDispatch disp)
                            (env { envActionW = envActionW env . wrapper })
        in env { envRoutes = envRoutes env' <> envRoutes env }
+
+
+  -- |
+  -- Wrap all /following/ actions with an action transformer.
+  --
+  -- This can come in handy e.g. to tune cache control:
+  --
+  -- @
+  -- app :: Application
+  -- app = 'dispatch' runAction $ do
+  --   'wrapRoutes' ('Web.Hikaru.Action.defaultHeader' hCacheControl "no-cache" >>)
+  --
+  --   'route' $ getRootR  \<$ 'get'
+  --   'route' $ getHelloR \<$ 'get' <* 'seg' "hello" \<*\> 'arg'
+  -- @
+  --
+  wrapActions :: (r -> r) -> Dispatch r l ()
+  wrapActions wrapper = Dispatch do
+    modify \env -> env { envActionW = envActionW env . wrapper }
 
 
   -- |
