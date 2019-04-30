@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 080de386f6ba22ecc810a0d7c402cafe3f478f868743a1cf4d032526533ec874
+-- hash: 5bd2ef2d8b30262b78d08a75820ec302544ee4dceca00d3cf5d089adaae96b1f
 
 name:           hikaru
 version:        0.1.0.0
@@ -42,7 +42,7 @@ library
       Paths_hikaru
   hs-source-dirs:
       lib
-  default-extensions: BlockArguments DataKinds DefaultSignatures DeriveGeneric DuplicateRecordFields FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TupleSections TypeFamilies
+  default-extensions: BlockArguments DeriveGeneric FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving
   ghc-options: -Wall -Wcompat
   build-depends:
       aeson >=1.4 && <1.5
