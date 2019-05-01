@@ -63,7 +63,6 @@ module Web.Hikaru.Action
 
   -- ** Errors
   , throwError
-  , throwErrorMsg
 
   -- ** Finalizing
   , registerFinalizer
@@ -482,7 +481,7 @@ where
 
         if matchMediaList ctype [ "application/json", "text/json" ]
            then return ()
-           else throwErrorMsg UnsupportedMediaType "Send some JSON!"
+           else throwError UnsupportedMediaType "Send some JSON!"
 
         -- Taint and read.
         setActionField aeBody BodyTainted
@@ -490,7 +489,7 @@ where
 
         -- Try to parse.
         value <- case eitherDecode' body of
-                   Left reason -> throwErrorMsg BadRequest (cs reason)
+                   Left reason -> throwError BadRequest (cs reason)
                    Right value -> return value
 
         -- Cache and return.
@@ -500,7 +499,7 @@ where
       -- Now this is bad. We have already read the body,
       -- but not as a JSON. This is an internal error.
       _else -> do
-        throwErrorMsg InternalError "Body has been parsed as a non-JSON."
+        throwError InternalError "Body has been parsed as a non-JSON."
 
 
   -- |
@@ -549,7 +548,7 @@ where
         getChunk <- getBodyChunkIO
 
         case bodyType of
-          Nothing -> throwErrorMsg UnsupportedMediaType "Send some form!"
+          Nothing -> throwError UnsupportedMediaType "Send some form!"
           Just bt -> do
             -- Prepare for uploaded files finalization.
             rtis <- createInternalState
@@ -566,7 +565,7 @@ where
       -- Now this is bad. We have already read the body,
       -- but not as a form. This is an internal error.
       _else -> do
-        throwErrorMsg InternalError "Body has been parsed as a non-form."
+        throwError InternalError "Body has been parsed as a non-form."
 
 
   -- |
@@ -602,7 +601,7 @@ where
       -- Now this is bad. We have already read the body,
       -- but not as a raw data. This is an internal error.
       _else -> do
-        throwErrorMsg InternalError "Body has already been parsed."
+        throwError InternalError "Body has already been parsed."
 
 
   -- Building Response -------------------------------------------------------
@@ -793,20 +792,10 @@ where
 
 
   -- |
-  -- Throw error and hope someone catches it.
-  --
-  -- Actually, dispatcher checks for these and uses the registered
-  -- handlers to serve up customizable error pages.
-  --
-  throwError :: (MonadAction m) => (RequestError, Text) -> m a
-  throwError = liftIO . throwIO
-
-
-  -- |
   -- Same as 'throwError', but with a message.
   --
-  throwErrorMsg :: (MonadAction m) => RequestError -> Text -> m a
-  throwErrorMsg exn msg = liftIO $ throwIO (exn, msg)
+  throwError :: (MonadAction m) => RequestError -> Text -> m a
+  throwError exn msg = liftIO $ throwIO (exn, msg)
 
 
   -- Finalizing --------------------------------------------------------------
