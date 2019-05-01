@@ -195,7 +195,7 @@ where
 
     where
       response st = resp . responseLBS st [(hContentType, "text/plain")]
-                         . cs . (\m d -> if m == "" then d else m) msg
+                         . cs . (<> "\n" <> msg)
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
