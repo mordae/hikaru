@@ -67,9 +67,6 @@ module Web.Hikaru.Action
   -- ** Finalizing
   , registerFinalizer
 
-  -- ** Helper Types
-  , ResponseMaker
-
   -- ** Action Environment
   , ActionEnv
   , makeActionEnv
