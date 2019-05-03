@@ -271,10 +271,10 @@ where
   -- |
   -- Score route with respect to the request using the supplied function.
   --
-  score :: (Request -> Result) -> Route Void
+  score :: (Request -> Result) -> Route ()
   score fn =
     Route \env@Env{..} ->
-      (env { envScoring = fn : envScoring }, Just (error "void"))
+      (env { envScoring = fn : envScoring }, Just ())
 
 
   -- |
@@ -286,10 +286,10 @@ where
   -- your action performs some kind of additional content negotiation.
   -- All the scoring functions in this module do this automatically.
   --
-  vary :: [HeaderName] -> Route Void
+  vary :: [HeaderName] -> Route ()
   vary hs =
     Route \env@Env{..} ->
-      (env { envVary = hs <> envVary }, Just (error "void"))
+      (env { envVary = hs <> envVary }, Just ())
 
 
   -- Methods -----------------------------------------------------------------
@@ -300,7 +300,7 @@ where
   --
   -- Fails with 'MethodNotAllowed' if a different method was used.
   --
-  method :: Method -> Route Void
+  method :: Method -> Route ()
   method meth = score \req ->
     if meth == requestMethod req
        then Success 1.0
@@ -310,42 +310,42 @@ where
   -- |
   -- Same as 'method' with the @GET@ argument.
   --
-  get :: Route Void
+  get :: Route ()
   get = method "GET"
 
 
   -- |
   -- Same as 'method' with the @POST@ argument.
   --
-  post :: Route Void
+  post :: Route ()
   post = method "POST"
 
 
   -- |
   -- Same as 'method' with the @HEAD@ argument.
   --
-  head :: Route Void
+  head :: Route ()
   head = method "HEAD"
 
 
   -- |
   -- Same as 'method' with the @PUT@ argument.
   --
-  put :: Route Void
+  put :: Route ()
   put = method "PUT"
 
 
   -- |
   -- Same as 'method' with the @PATCH@ argument.
   --
-  patch :: Route Void
+  patch :: Route ()
   patch = method "PATCH"
 
 
   -- |
   -- Same as 'method' with the @DELETE@ argument.
   --
-  delete :: Route Void
+  delete :: Route ()
   delete = method "DELETE"
 
 
@@ -354,7 +354,7 @@ where
   -- media types and fail with 'UnsupportedMediaType' if not.
   -- Adds @Vary: Content-Type@.
   --
-  acceptContent :: [Media] -> Route Void
+  acceptContent :: [Media] -> Route ()
   acceptContent media =
     vary [hContentType] <* score \req ->
       let header = parseMedia (cs $ getContentType req)
@@ -366,7 +366,7 @@ where
   -- |
   -- Shortcut to accept only form submissions.
   --
-  acceptForm :: Route Void
+  acceptForm :: Route ()
   acceptForm = acceptContent [ "application/x-www-form-urlencoded"
                              , "multipart/form-data"
                              ]
@@ -375,7 +375,7 @@ where
   -- |
   -- Shortcut to accept only JSON documents.
   --
-  acceptJSON :: Route Void
+  acceptJSON :: Route ()
   acceptJSON = acceptContent [ "application/json"
                              , "text/json"
                              ]
@@ -385,7 +385,7 @@ where
   -- Check that we can send an acceptable response to the client and
   -- fail with 'NotAcceptable' if not. Add @Vary: Accept@.
   --
-  offerContent :: [Media] -> Route Void
+  offerContent :: [Media] -> Route ()
   offerContent media =
     vary [hAccept] <* score \req ->
       let header = parseMedia (cs $ getAccept req)
@@ -397,21 +397,21 @@ where
   -- |
   -- Shortcut to offer HTML replies only.
   --
-  offerHTML :: Route Void
+  offerHTML :: Route ()
   offerHTML = offerContent ["text/html"]
 
 
   -- |
   -- Shortcut to offer plain text replies only.
   --
-  offerText :: Route Void
+  offerText :: Route ()
   offerText = offerContent ["text/plain"]
 
 
   -- |
   -- Shortcut to offer JSON replies only.
   --
-  offerJSON :: Route Void
+  offerJSON :: Route ()
   offerJSON = offerContent ["application/json"]
 
 
@@ -419,7 +419,7 @@ where
   -- Check that we can send an acceptable charset to the client and
   -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Charset@.
   --
-  offerCharset :: [Media] -> Route Void
+  offerCharset :: [Media] -> Route ()
   offerCharset media =
     vary [hAcceptCharset] <* score \req ->
       let header = parseMedia (cs $ getAcceptCharset req)
@@ -432,7 +432,7 @@ where
   -- Check that we can send an acceptable encoding to the client and
   -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Encoding@.
   --
-  offerEncoding :: [Media] -> Route Void
+  offerEncoding :: [Media] -> Route ()
   offerEncoding media =
     vary [hAcceptEncoding] <* score \req ->
       let header = parseMedia (cs $ getAcceptEncoding req)
@@ -445,7 +445,7 @@ where
   -- Check that we can send an acceptable language to the client and
   -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Language@.
   --
-  offerLanguage :: [Media] -> Route Void
+  offerLanguage :: [Media] -> Route ()
   offerLanguage media =
     vary [hAcceptLanguage] <* score \req ->
       let header = parseMedia (cs $ getAcceptLanguage req)
