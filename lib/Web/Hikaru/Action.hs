@@ -18,7 +18,7 @@ module Web.Hikaru.Action
   , getRequest
   , getMethod
   , getHeaders
-  , getHeader
+  , getHeaderMaybe
   , getAccept
   , getAcceptCharset
   , getAcceptEncoding
@@ -29,6 +29,7 @@ module Web.Hikaru.Action
   , getParams
   , getParamMaybe
   , getParamList
+  , getParamDefault
   , getBodyLength
   , setBodyLimit
   , getBodyLimit
@@ -38,7 +39,12 @@ module Web.Hikaru.Action
   , getJSON
   , getBody
   , getFields
+  , getFieldMaybe
+  , getFieldDefault
+  , getFieldList
   , getFiles
+  , getFileMaybe
+  , getFileList
 
   -- ** Building Response
   , setStatus
@@ -204,7 +210,7 @@ where
       -- ^ Body has not yet been touched.
     | BodyTainted
       -- ^ Body has been partially consumed.
-    | BodyForm ([Param], [File FilePath])
+    | BodyForm ([(Text, Text)], [(Text, FileInfo FilePath)])
       -- ^ Body has been successfully parsed as a form.
     | BodyJSON Value
       -- ^ Body has been successfully parsed as a JSON.
@@ -253,8 +259,8 @@ where
   -- |
   -- Obtain a specific request header.
   --
-  getHeader :: (MonadAction m) => HeaderName -> m (Maybe ByteString)
-  getHeader n = lookup n <$> getHeaders
+  getHeaderMaybe :: (MonadAction m) => HeaderName -> m (Maybe ByteString)
+  getHeaderMaybe n = lookup n <$> getHeaders
 
 
   -- |
@@ -262,7 +268,7 @@ where
   --
   getAccept :: (MonadAction m) => m [Media]
   getAccept = parseMedia <$> cs . fromMaybe "*/*"
-                         <$> getHeader hAccept
+                         <$> getHeaderMaybe hAccept
 
 
   -- |
@@ -270,7 +276,7 @@ where
   --
   getAcceptCharset :: (MonadAction m) => m [Media]
   getAcceptCharset = parseMedia <$> cs . fromMaybe "*"
-                                <$> getHeader hAcceptCharset
+                                <$> getHeaderMaybe hAcceptCharset
 
 
   -- |
@@ -279,7 +285,7 @@ where
   --
   getAcceptEncoding :: (MonadAction m) => m [Media]
   getAcceptEncoding = parseMedia <$> cs . fromMaybe "identity,*;q=0"
-                                 <$> getHeader hAcceptEncoding
+                                 <$> getHeaderMaybe hAcceptEncoding
 
 
   -- |
@@ -287,7 +293,7 @@ where
   --
   getAcceptLanguage :: (MonadAction m) => m [Media]
   getAcceptLanguage = parseMedia <$> cs . fromMaybe "*/*"
-                                 <$> getHeader hAcceptLanguage
+                                 <$> getHeaderMaybe hAcceptLanguage
 
 
   -- |
@@ -296,7 +302,7 @@ where
   --
   getContentType :: (MonadAction m) => m Media
   getContentType = do
-    media <- fmap parseMedia <$> fmap cs <$> getHeader hContentType
+    media <- fmap parseMedia <$> fmap cs <$> getHeaderMaybe hContentType
 
     case media of
       Just (x:_) -> return x
@@ -330,6 +336,14 @@ where
   getParamMaybe n = lookup n <$> getParams
                     >>= \case Nothing  -> return $ Nothing
                               Just val -> return $ fromParam val
+
+
+  -- |
+  -- Similar to 'getParamMaybe', but return either the parsed parameter
+  -- or a specified default value.
+  --
+  getParamDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getParamDefault n v = fromMaybe v <$> getParamMaybe n
 
 
   -- |
@@ -527,18 +541,63 @@ where
 
 
   -- |
+  -- Obtain a specific form field and parse it on the fly to the target type.
+  -- Parsing failure maps to 'Nothing'.
+  --
+  getFieldMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
+  getFieldMaybe n = lookup n <$> getFields
+                    >>= \case Nothing  -> return $ Nothing
+                              Just val -> return $ fromParam val
+
+
+  -- |
+  -- Similar to 'getFieldMaybe', but return either the parsed field
+  -- or a specified default value.
+  --
+  getFieldDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
+
+
+  -- |
+  -- Obtain a group of form fields with the same name and parse them on the
+  -- fly to the target type.
+  --
+  getFieldList :: (MonadAction m, FromParam a) => Text -> m [a]
+  getFieldList n = mapMaybe (fromParam . snd)
+                   <$> filter ((n ==) . fst)
+                   <$> getFields
+
+
+  -- |
   -- Identical to 'getFields', except it returns information about
   -- files uploaded through the form.
   --
-  getFiles :: (MonadAction m) => m [File FilePath]
+  getFiles :: (MonadAction m) => m [(Text, FileInfo FilePath)]
   getFiles = snd <$> getForm
+
+
+  -- |
+  -- Obtain a specific form file
+  --
+  getFileMaybe :: (MonadAction m) => Text -> m (Maybe (FileInfo FilePath))
+  getFileMaybe n = lookup n <$> getFiles
+                    >>= \case Nothing  -> return $ Nothing
+                              Just val -> return $ Just val
+
+
+  -- |
+  -- Obtain a group of form files with the same name.
+  --
+  getFileList :: (MonadAction m) => Text -> m [FileInfo FilePath]
+  getFileList n = map snd . filter ((n ==) . fst) <$> getFiles
 
 
   -- |
   -- Backend for both 'getFields' and 'getFiles' that parses,
   -- caches and returns form data.
   --
-  getForm :: (MonadAction m) => m ([Param], [File FilePath])
+  getForm :: (MonadAction m)
+          => m ([(Text, Text)], [(Text, FileInfo FilePath)])
   getForm = do
     cache <- getActionField aeBody
 
@@ -559,8 +618,11 @@ where
             registerFinalizer (closeInternalState rtis)
 
             -- Parse the form data.
-            form <- liftIO do
+            form' <- liftIO do
               sinkRequestBody (tempFileBackEnd rtis) bt getChunk
+
+            -- Convert ByteString to Text fields.
+            let form = csForm form'
 
             -- Cache and return.
             setActionField aeBody (BodyForm form)
@@ -570,6 +632,17 @@ where
       -- but not as a form. This is an internal error.
       _else -> do
         throwError InternalError "Body has been parsed as a non-form."
+
+
+  -- |
+  -- Convert form names and fields from 'ByteString' to 'Text'.
+  --
+  csForm :: ([Param], [File FilePath])
+         -> ([(Text, Text)], [(Text, FileInfo FilePath)])
+  csForm (ps, fs) = (ps', fs')
+    where
+      ps' = map (\(n, v) -> (cs n, cs v)) ps
+      fs' = map (\(n, f) -> (cs n, f)) fs
 
 
   -- |
