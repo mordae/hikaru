@@ -19,6 +19,7 @@ module Web.Hikaru.Action
   , getMethod
   , getHeaders
   , getHeaderMaybe
+  , getHeaderDefault
   , getAccept
   , getAcceptCharset
   , getAcceptEncoding
@@ -33,6 +34,7 @@ module Web.Hikaru.Action
   , getCookies
   , getCookieMaybe
   , getCookieDefault
+  , getReferrer
   , getBodyLength
   , setBodyLimit
   , getBodyLimit
@@ -63,6 +65,7 @@ module Web.Hikaru.Action
   , sendString
   , sendJSON
   , redirect
+  , redirectBack
   , setResponseFile
   , setResponseBuilder
   , setResponseBS
@@ -271,6 +274,14 @@ where
 
 
   -- |
+  -- Obtain a specific request header or the given default value.
+  --
+  getHeaderDefault :: (MonadAction m)
+                   => HeaderName -> ByteString -> m ByteString
+  getHeaderDefault n v = fromMaybe v <$> getHeaderMaybe n
+
+
+  -- |
   -- Obtain the Accept header value or the default value of @\"*/*\"@.
   --
   getAccept :: (MonadAction m) => m [Media]
@@ -391,6 +402,17 @@ where
   --
   getCookieDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
+
+
+  -- |
+  -- Returns HTTP @Referrer@ header or just @/@.
+  --
+  -- Useful for redirects back to where the user came from.
+  --
+  getReferrer :: (MonadAction m) => m Text
+  getReferrer = do
+    header <- getHeaderDefault hReferer "/"
+    return (cs header)
 
 
   -- |
@@ -852,6 +874,13 @@ where
   redirect location = do
     setStatus status302
     setHeader hLocation (cs location)
+
+
+  -- |
+  -- Redirect the user to where he came from using 'getReferrer'.
+  --
+  redirectBack :: (MonadAction m) => m ()
+  redirectBack = redirect =<< getReferrer
 
 
   -- |
