@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 73104125e4378c6f6439e76e1ce707e88a84d9aa8a01b85bd279a636e97f94ca
+-- hash: da893a0d06b5067ae693df0f78119bcf5c7a0742b3916c78df7e91e555477f18
 
 name:           hikaru
 version:        0.1.0.0
@@ -53,6 +53,7 @@ library
     , bytestring >=0.10 && <0.11
     , case-insensitive >=1.2 && <1.3
     , containers >=0.6 && <0.7
+    , cookie >=0.4 && <0.5
     , http-types >=0.12 && <0.13
     , lucid >=2.9 && <2.10
     , mtl >=2.2 && <2.3

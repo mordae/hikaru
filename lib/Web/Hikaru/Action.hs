@@ -30,6 +30,9 @@ module Web.Hikaru.Action
   , getParamMaybe
   , getParamList
   , getParamDefault
+  , getCookies
+  , getCookieMaybe
+  , getCookieDefault
   , getBodyLength
   , setBodyLimit
   , getBodyLimit
@@ -53,6 +56,8 @@ module Web.Hikaru.Action
   , addHeader
   , defaultHeader
   , modifyHeader
+  , setCookie
+  , setCookieEx
   , sendHTML
   , sendText
   , sendString
@@ -98,6 +103,7 @@ where
   import Network.Wai
   import Network.Wai.Internal (getRequestBodyChunk)
   import Network.Wai.Parse
+  import Web.Cookie
   import Web.Hikaru.Media
   import Web.Hikaru.Types
 
@@ -340,7 +346,7 @@ where
 
   -- |
   -- Similar to 'getParamMaybe', but return either the parsed parameter
-  -- or a specified default value.
+  -- or the specified default value.
   --
   getParamDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
@@ -354,6 +360,36 @@ where
   getParamList n = mapMaybe (fromParam . snd)
                    <$> filter ((n ==) . fst)
                    <$> getParams
+
+
+  -- |
+  -- Obtain all request cookies.
+  --
+  getCookies :: (MonadAction m) => m [(Text, Text)]
+  getCookies = do
+    mc <- getHeaderMaybe hCookie
+
+    case mc of
+      Nothing -> return []
+      Just bs -> return $ map cs2 $ parseCookies bs
+
+
+  -- |
+  -- Obtain a specific cookie and parse it on the fly to the target type.
+  -- Parsing failure maps to 'Nothing'.
+  --
+  getCookieMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
+  getCookieMaybe n = lookup n <$> getCookies
+                     >>= \case Nothing  -> return $ Nothing
+                               Just val -> return $ fromParam val
+
+
+  -- |
+  -- Similar to 'getCookieMaybe', but return either the parsed cookie
+  -- or the specified default value.
+  --
+  getCookieDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
 
 
   -- |
@@ -536,8 +572,7 @@ where
   --   Use 'setBodyLimit' to adjust the limit to your liking.
   --
   getFields :: (MonadAction m) => m [(Text, Text)]
-  getFields = map convert <$> fst <$> getForm
-    where convert (n, v) = (cs n, cs v)
+  getFields = map cs2 <$> fst <$> getForm
 
 
   -- |
@@ -552,7 +587,7 @@ where
 
   -- |
   -- Similar to 'getFieldMaybe', but return either the parsed field
-  -- or a specified default value.
+  -- or the specified default value.
   --
   getFieldDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
@@ -639,10 +674,7 @@ where
   --
   csForm :: ([Param], [File FilePath])
          -> ([(Text, Text)], [(Text, FileInfo FilePath)])
-  csForm (ps, fs) = (ps', fs')
-    where
-      ps' = map (\(n, v) -> (cs n, cs v)) ps
-      fs' = map (\(n, f) -> (cs n, f)) fs
+  csForm (ps, fs) = (map cs2 ps, map cs1 fs)
 
 
   -- |
@@ -742,6 +774,32 @@ where
     where
       modify hs = (n, v') : deleteBy headerEq (n, v') hs
         where v' = fn (lookup n hs)
+
+
+  -- |
+  -- Set a cookie with just a name and a value.
+  --
+  -- Such cookies are valid for the whole domain, expire when the browser
+  -- is closed, can be accessed from JavaScript and may be sent with
+  -- cross-site requests.
+  --
+  -- Do not use cookies set in this way for anything else than storing
+  -- simple user preferences.
+  --
+  setCookie :: (MonadAction m) => ByteString -> ByteString -> m ()
+  setCookie name value = do
+    setCookieEx $ defaultSetCookie { setCookieName  = name
+                                   , setCookieValue = value
+                                   , setCookiePath  = Just "/"
+                                   }
+
+
+  -- |
+  -- Set a cookie using the 'Web.Cookie.SetCookie' directly.
+  --
+  setCookieEx :: (MonadAction m) => SetCookie -> m ()
+  setCookieEx cookie = do
+    addHeader hSetCookie $ cs $ toLazyByteString $ renderSetCookie cookie
 
 
   -- |
@@ -891,6 +949,23 @@ where
   --
   headerEq :: (Eq a) => (a, b) -> (a, b) -> Bool
   headerEq (x, _) (y, _) = x == y
+
+
+  -- |
+  -- Helper to apply 'cs' to both elements of a 2-tuple.
+  --
+  cs2 :: ( ConvertibleStrings a c
+         , ConvertibleStrings b d
+         )
+      => (a, b) -> (c, d)
+  cs2 (x, y) = (cs x, cs y)
+
+
+  -- |
+  -- Helper to apply 'cs' to the first element of a 2-tuple.
+  --
+  cs1 :: (ConvertibleStrings a c) => (a, b) -> (c, b)
+  cs1 (x, y) = (cs x, y)
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
