@@ -62,6 +62,7 @@ module Web.Hikaru.Action
   , sendText
   , sendString
   , sendJSON
+  , redirect
   , setResponseFile
   , setResponseBuilder
   , setResponseBS
@@ -841,6 +842,16 @@ where
   sendJSON json = do
     defaultHeader hContentType "application/json"
     setResponseBS (encode json)
+
+
+  -- |
+  -- Set the @Location@ header and response status to redirect the user
+  -- elsewhere.
+  --
+  redirect :: (MonadAction m) => Text -> m ()
+  redirect location = do
+    setStatus status302
+    setHeader hLocation (cs location)
 
 
   -- |
