@@ -13,14 +13,18 @@ This module re-exports other modules in the package.
 module Web.Hikaru
   (
   -- * Exported Modules
-    module Web.Hikaru.Dispatch
+    module Web.Hikaru.Action
+  , module Web.Hikaru.Dispatch
+  , module Web.Hikaru.Link
+  , module Web.Hikaru.Media
   , module Web.Hikaru.Route
-  , module Web.Hikaru.Action
   , module Web.Hikaru.Types
   )
 where
   import Web.Hikaru.Action
   import Web.Hikaru.Dispatch
+  import Web.Hikaru.Link
+  import Web.Hikaru.Media
   import Web.Hikaru.Route
   import Web.Hikaru.Types
 
