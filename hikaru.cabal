@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5bd2ef2d8b30262b78d08a75820ec302544ee4dceca00d3cf5d089adaae96b1f
+-- hash: 73104125e4378c6f6439e76e1ce707e88a84d9aa8a01b85bd279a636e97f94ca
 
 name:           hikaru
 version:        0.1.0.0
@@ -38,6 +38,7 @@ library
       Web.Hikaru.Route
       Web.Hikaru.Dispatch
       Web.Hikaru.Action
+      Web.Hikaru.Link
   other-modules:
       Paths_hikaru
   hs-source-dirs:

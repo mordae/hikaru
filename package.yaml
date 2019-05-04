@@ -66,5 +66,6 @@ library:
     - Web.Hikaru.Route
     - Web.Hikaru.Dispatch
     - Web.Hikaru.Action
+    - Web.Hikaru.Link
 
 # EOF
