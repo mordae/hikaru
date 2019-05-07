@@ -812,10 +812,10 @@ where
   -- Do not use cookies set in this way for anything else than storing
   -- simple user preferences.
   --
-  setCookie :: (MonadAction m) => ByteString -> ByteString -> m ()
+  setCookie :: (MonadAction m) => Text -> Text -> m ()
   setCookie name value = do
-    setCookieEx $ defaultSetCookie { setCookieName  = name
-                                   , setCookieValue = value
+    setCookieEx $ defaultSetCookie { setCookieName  = cs name
+                                   , setCookieValue = cs value
                                    , setCookiePath  = Just "/"
                                    }
 
