@@ -334,6 +334,9 @@ where
   getPathInfo = pathInfo <$> getRequest
 
 
+  -- |
+  -- Obtain request path as an unsplit 'Text'.
+  --
   getPathInfoRaw :: (MonadAction m) => m Text
   getPathInfoRaw = cs <$> rawPathInfo <$> getRequest
 
@@ -976,6 +979,10 @@ where
   -- Finalizing --------------------------------------------------------------
 
 
+  -- |
+  -- Register an IO action to run once the request is either handler
+  -- or fails with an error.
+  --
   registerFinalizer :: (MonadAction m) => IO a -> m ()
   registerFinalizer fin = do
     modifyActionField aeFinalize (fin >>)
