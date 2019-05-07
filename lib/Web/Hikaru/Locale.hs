@@ -46,7 +46,6 @@ where
   import Data.Text (Text)
   import Lucid
   import Web.Hikaru.Action
-  import Web.Hikaru.Media
 
 
   -- |
@@ -72,15 +71,12 @@ where
 
 
   -- |
-  -- Localize given message to the language indicated by the
-  -- 'getAcceptLanguage' function executed in the context of
-  -- the current action.
+  -- Localize given message to the language indicated by the 'getLanguages'
+  -- function executed in the context of the current action.
   --
   lc_ :: (MonadAction m, Localized a) => a -> HtmlT m ()
   lc_ msg = do
-    langs <- getAcceptLanguage
-             <&> filter ((> 0) . mediaQuality)
-             <&> map mediaMainType
+    langs <- getLanguages
 
     case mapMaybe (flip localize msg) langs of
       []  -> toHtml msg

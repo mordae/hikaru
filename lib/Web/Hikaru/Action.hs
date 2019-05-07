@@ -24,6 +24,7 @@ module Web.Hikaru.Action
   , getAcceptCharset
   , getAcceptEncoding
   , getAcceptLanguage
+  , getLanguages
   , getContentType
   , getPathInfo
   , getPathInfoRaw
@@ -312,6 +313,29 @@ where
   getAcceptLanguage :: (MonadAction m) => m [Media]
   getAcceptLanguage = parseMedia <$> cs . fromMaybe "*/*"
                                  <$> getHeaderMaybe hAcceptLanguage
+
+
+  -- |
+  -- Return list of best languages based on the current value of the @lang@
+  -- query string parameter or @lang@ cookie followed by whatever the
+  -- 'getAcceptLanguage' returns.
+  --
+  -- If the @lang@ query string parameter was supplied, also sets the @lang@
+  -- cookie so that the selection is more permanent.
+  --
+  getLanguages :: (MonadAction m) => m [Text]
+  getLanguages = do
+    preferred <- getParamMaybe "lang"
+    previous  <- getCookieMaybe "lang"
+    acceptable <- getAcceptLanguage
+                  <&> filter ((> 0) . mediaQuality)
+                  <&> map mediaMainType
+
+    case preferred of
+      Nothing   -> return ()
+      Just lang -> setCookie "lang" (cs lang)
+
+    return $ nub $ maybeToList preferred <> maybeToList previous <> acceptable
 
 
   -- |
