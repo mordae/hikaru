@@ -8,6 +8,31 @@ Stability   :  unstable
 Portability :  non-portable (ghc)
 
 This module provides support for website localization.
+
+Example:
+
+@
+data SampleMessages
+  = MsgSuccess
+  | MsgFailure
+
+instance 'ToHtml' SampleMessages where
+  toHtmlRaw = toHtml
+  toHtml MsgSuccess = \"Success\"
+  toHtml MsgFailure = \"Failure\"
+
+instance Localized SampleMessages where
+  localize \"cs\" MsgSuccess = Just \"Úspěch\"
+  localize \"cs\" MsgFailure = Just \"Selhání\"
+  localize _locale _msg    = Nothing
+
+getSampleR :: Bool -> Action ()
+getSampleR flag = do
+  'sendHTML' $ do
+    if flag
+       then lc_ MsgSuccess
+       else lc_ MsgFailure
+@
 -}
 
 module Web.Hikaru.Locale
