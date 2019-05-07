@@ -65,7 +65,10 @@ where
   -- ]
   --
   parseMedia :: Text -> [Media]
-  parseMedia = mapMaybe build . mapMaybe (group 0) . findAll reMedia
+  parseMedia = sortWith (negate . mediaQuality)
+             . mapMaybe build
+             . mapMaybe (group 0)
+             . findAll reMedia
     where
       build :: Text -> Maybe Media
       build t = do
