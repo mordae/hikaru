@@ -53,7 +53,9 @@ where
   --
   lc_ :: (MonadAction m, Localized a) => a -> HtmlT m ()
   lc_ msg = do
-    langs <- map mediaMainType <$> getAcceptLanguage
+    langs <- getAcceptLanguage
+             <&> filter ((> 0) . mediaQuality)
+             <&> map mediaMainType
 
     case mapMaybe (flip localize msg) langs of
       []  -> toHtml msg
