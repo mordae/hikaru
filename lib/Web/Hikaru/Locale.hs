@@ -24,6 +24,7 @@ instance 'ToHtml' SampleMessages where
 instance Localized SampleMessages where
   localize \"cs\" MsgSuccess = Just \"Úspěch\"
   localize \"cs\" MsgFailure = Just \"Selhání\"
+  localize \"en\" msg        = Just (toHtml msg)
   localize _locale _msg    = Nothing
 
 getSampleR :: Bool -> Action ()
