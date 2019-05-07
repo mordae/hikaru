@@ -62,11 +62,12 @@ library:
 
   exposed-modules:
     - Web.Hikaru
-    - Web.Hikaru.Types
+    - Web.Hikaru.Action
+    - Web.Hikaru.Dispatch
+    - Web.Hikaru.Link
+    - Web.Hikaru.Locale
     - Web.Hikaru.Media
     - Web.Hikaru.Route
-    - Web.Hikaru.Dispatch
-    - Web.Hikaru.Action
-    - Web.Hikaru.Link
+    - Web.Hikaru.Types
 
 # EOF
