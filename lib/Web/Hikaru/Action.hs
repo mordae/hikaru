@@ -24,7 +24,6 @@ module Web.Hikaru.Action
   , getAcceptCharset
   , getAcceptEncoding
   , getAcceptLanguage
-  , getLanguages
   , getContentType
   , getPathInfo
   , getPathInfoRaw
@@ -79,6 +78,10 @@ module Web.Hikaru.Action
 
   -- ** Errors
   , throwError
+
+  -- ** Localization
+  , setLanguages
+  , getLanguages
 
   -- ** Finalizing
   , registerFinalizer
@@ -178,6 +181,7 @@ where
       , aeFinalize     :: IORef (IO ())
       , aeBodyLimit    :: IORef Int64
       , aeBodyCounter  :: IORef Int64
+      , aeLanguages    :: IORef [Text]
       }
 
 
@@ -241,6 +245,7 @@ where
                                 <*> newIORef (return ())
                                 <*> newIORef (10 * 1024 * 1024)
                                 <*> newIORef 0
+                                <*> newIORef []
 
 
   -- Inspecting Request ------------------------------------------------------
@@ -313,29 +318,6 @@ where
   getAcceptLanguage :: (MonadAction m) => m [Media]
   getAcceptLanguage = parseMedia <$> cs . fromMaybe "*/*"
                                  <$> getHeaderMaybe hAcceptLanguage
-
-
-  -- |
-  -- Return list of best languages based on the current value of the @lang@
-  -- query string parameter or @lang@ cookie followed by whatever the
-  -- 'getAcceptLanguage' returns.
-  --
-  -- If the @lang@ query string parameter was supplied, also sets the @lang@
-  -- cookie so that the selection is more permanent.
-  --
-  getLanguages :: (MonadAction m) => m [Text]
-  getLanguages = do
-    preferred <- getParamMaybe "lang"
-    previous  <- getCookieMaybe "lang"
-    acceptable <- getAcceptLanguage
-                  <&> filter ((> 0) . mediaQuality)
-                  <&> map mediaMainType
-
-    case preferred of
-      Nothing   -> return ()
-      Just lang -> setCookie "lang" (cs lang)
-
-    return $ nub $ maybeToList preferred <> maybeToList previous <> acceptable
 
 
   -- |
@@ -998,6 +980,29 @@ where
   --
   throwError :: (MonadAction m) => RequestError -> Text -> m a
   throwError exn msg = liftIO $ throwIO (exn, msg)
+
+
+  -- Localization ------------------------------------------------------------
+
+
+  -- |
+  -- Get list of languages in order of their preference to be used
+  -- when localizing the result of the action.
+  --
+  -- Languages must be set using the 'setLanguages' function or through
+  -- the localization tools found in the "Web.Hikaru.Locale" module.
+  --
+  getLanguages :: (MonadAction m) => m [Text]
+  getLanguages = getActionField aeLanguages
+
+
+  -- |
+  -- Set list of localization languages.
+  --
+  -- See 'getLanguages' above for more information.
+  --
+  setLanguages :: (MonadAction m) => [Text] -> m ()
+  setLanguages = setActionField aeLanguages
 
 
   -- Finalizing --------------------------------------------------------------
