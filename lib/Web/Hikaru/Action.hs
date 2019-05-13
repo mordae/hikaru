@@ -90,6 +90,10 @@ module Web.Hikaru.Action
   , ActionEnv
   , makeActionEnv
   , respond
+
+  -- ** Re-Exports
+  , FileInfo
+  , FilePath
   )
 where
   import BasePrelude hiding (length)
