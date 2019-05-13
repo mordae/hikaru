@@ -222,6 +222,12 @@ where
 
 
   -- |
+  -- Fields and files sent using a web form.
+  --
+  type FormData = ([(Text, Text)], [(Text, FileInfo FilePath)])
+
+
+  -- |
   -- Types of the request body.
   --
   data RequestBody
@@ -229,7 +235,7 @@ where
       -- ^ Body has not yet been touched.
     | BodyTainted
       -- ^ Body has been partially consumed.
-    | BodyForm ([(Text, Text)], [(Text, FileInfo FilePath)])
+    | BodyForm FormData
       -- ^ Body has been successfully parsed as a form.
     | BodyJSON Value
       -- ^ Body has been successfully parsed as a JSON.
@@ -608,7 +614,7 @@ where
   --   Use 'setBodyLimit' to adjust the limit to your liking.
   --
   getFields :: (MonadAction m) => m [(Text, Text)]
-  getFields = map cs2 <$> fst <$> getForm
+  getFields = map cs2 <$> fst <$> getFormData
 
 
   -- |
@@ -644,7 +650,7 @@ where
   -- files uploaded through the form.
   --
   getFiles :: (MonadAction m) => m [(Text, FileInfo FilePath)]
-  getFiles = snd <$> getForm
+  getFiles = snd <$> getFormData
 
 
   -- |
@@ -667,9 +673,16 @@ where
   -- Backend for both 'getFields' and 'getFiles' that parses,
   -- caches and returns form data.
   --
-  getForm :: (MonadAction m)
-          => m ([(Text, Text)], [(Text, FileInfo FilePath)])
-  getForm = do
+  -- * Throws 'UnsupportedMediaType' if the Content-Type does not
+  --   indicate a form payload.
+  --
+  -- * Throws 'BadRequest' if the payload fails to parse.
+  --
+  -- * Throws 'PayloadTooLarge' if the payload size limit is exceeded.
+  --   Use 'setBodyLimit' to adjust the limit to your liking.
+  --
+  getFormData :: (MonadAction m) => m FormData
+  getFormData = do
     cache <- getActionField aeBody
 
     case cache of
@@ -708,8 +721,7 @@ where
   -- |
   -- Convert form names and fields from 'ByteString' to 'Text'.
   --
-  csForm :: ([Param], [File FilePath])
-         -> ([(Text, Text)], [(Text, FileInfo FilePath)])
+  csForm :: ([Param], [File FilePath]) -> FormData
   csForm (ps, fs) = (map cs2 ps, map cs1 fs)
 
 
