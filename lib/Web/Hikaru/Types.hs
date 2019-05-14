@@ -80,10 +80,16 @@ where
     fromParam = readMaybe . unpack
 
   instance FromParam Bool where
-    fromParam = readMaybe . unpack
+    fromParam "true"  = Just True
+    fromParam "True"  = Just True
+    fromParam "false" = Just False
+    fromParam "False" = Just False
+    fromParam _else   = Nothing
 
   instance FromParam Char where
-    fromParam = readMaybe . unpack
+    fromParam inp = case (unpack inp) of
+                      [x]   -> Just x
+                      _else -> Nothing
 
   instance FromParam String where
     fromParam = Just . unpack
