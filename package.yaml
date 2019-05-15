@@ -64,6 +64,7 @@ library:
     - Web.Hikaru
     - Web.Hikaru.Action
     - Web.Hikaru.Dispatch
+    - Web.Hikaru.Form
     - Web.Hikaru.Link
     - Web.Hikaru.Locale
     - Web.Hikaru.Media

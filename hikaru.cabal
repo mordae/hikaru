@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d0a7845c898c2997900f8e5819b6a1f36591929a82a17fca5fe8c37c2bfc64d7
+-- hash: 720e967156931e18bf7c6039511f03e0f2ad855252f62cab1c80a2d9d8322d9e
 
 name:           hikaru
 version:        0.1.0.0
@@ -35,6 +35,7 @@ library
       Web.Hikaru
       Web.Hikaru.Action
       Web.Hikaru.Dispatch
+      Web.Hikaru.Form
       Web.Hikaru.Link
       Web.Hikaru.Locale
       Web.Hikaru.Media

@@ -15,6 +15,7 @@ module Web.Hikaru
   -- * Exported Modules
     module Web.Hikaru.Action
   , module Web.Hikaru.Dispatch
+  , module Web.Hikaru.Form
   , module Web.Hikaru.Link
   , module Web.Hikaru.Locale
   , module Web.Hikaru.Media
@@ -24,6 +25,7 @@ module Web.Hikaru
 where
   import Web.Hikaru.Action
   import Web.Hikaru.Dispatch
+  import Web.Hikaru.Form
   import Web.Hikaru.Link
   import Web.Hikaru.Locale
   import Web.Hikaru.Media
