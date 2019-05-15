@@ -12,6 +12,7 @@ This module provides types common for multiple other modules.
 
 module Web.Hikaru.Types
   ( FromParam(..)
+  , ToParam(..)
   , RequestError(..)
   , defaultHandler
   )
@@ -20,7 +21,7 @@ where
 
   import Data.ByteString (ByteString)
   import Data.String.Conversions
-  import Data.Text (Text, unpack)
+  import Data.Text (Text, pack, unpack)
   import Network.HTTP.Types.Status
   import Network.HTTP.Types.Header
   import Network.Wai
@@ -105,6 +106,79 @@ where
 
   instance FromParam Data.ByteString.Lazy.ByteString where
     fromParam = Just . cs
+
+
+  -- |
+  -- Values that can be represented as a piece of 'Text' to be used in a
+  -- route segment or a query string. One does not usually pass around
+  -- more complex arguments than these, so forgive the limited menu.
+  --
+  class ToParam a where
+    toParam :: a -> Text
+
+  instance ToParam Int where
+    toParam = pack . show
+
+  instance ToParam Int8 where
+    toParam = pack . show
+
+  instance ToParam Int16 where
+    toParam = pack . show
+
+  instance ToParam Int32 where
+    toParam = pack . show
+
+  instance ToParam Int64 where
+    toParam = pack . show
+
+  instance ToParam Word where
+    toParam = pack . show
+
+  instance ToParam Word8 where
+    toParam = pack . show
+
+  instance ToParam Word16 where
+    toParam = pack . show
+
+  instance ToParam Word32 where
+    toParam = pack . show
+
+  instance ToParam Word64 where
+    toParam = pack . show
+
+  instance ToParam Integer where
+    toParam = pack . show
+
+  instance ToParam Natural where
+    toParam = pack . show
+
+  instance ToParam Float where
+    toParam = pack . show
+
+  instance ToParam Double where
+    toParam = pack . show
+
+  instance ToParam Bool where
+    toParam True  = "true"
+    toParam False = "false"
+
+  instance ToParam Char where
+    toParam char = pack [char]
+
+  instance ToParam String where
+    toParam = pack
+
+  instance ToParam Text where
+    toParam = id
+
+  instance ToParam Data.Text.Lazy.Text where
+    toParam = cs
+
+  instance ToParam Data.ByteString.ByteString where
+    toParam = cs
+
+  instance ToParam Data.ByteString.Lazy.ByteString where
+    toParam = cs
 
 
   -- |
