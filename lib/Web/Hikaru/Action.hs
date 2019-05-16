@@ -892,12 +892,13 @@ where
 
 
   -- |
-  -- Set the @Location@ header and response status to redirect the user
-  -- elsewhere.
+  -- Set the response status to 303 (See Other), that will cause the browser
+  -- to obtain the address specified in the supplied @Location@ header using
+  -- the @GET@ method.
   --
   redirect :: (MonadAction m) => Text -> m ()
   redirect location = do
-    setStatus status302
+    setStatus status303
     setHeader hLocation (cs location)
 
 
