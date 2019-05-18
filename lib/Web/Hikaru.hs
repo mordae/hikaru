@@ -17,7 +17,7 @@ module Web.Hikaru
   , module Web.Hikaru.Dispatch
   , module Web.Hikaru.Form
   , module Web.Hikaru.Link
-  , module Web.Hikaru.Locale
+  , module Web.Hikaru.Localize
   , module Web.Hikaru.Media
   , module Web.Hikaru.Route
   , module Web.Hikaru.Types
@@ -27,7 +27,7 @@ where
   import Web.Hikaru.Dispatch
   import Web.Hikaru.Form
   import Web.Hikaru.Link
-  import Web.Hikaru.Locale
+  import Web.Hikaru.Localize
   import Web.Hikaru.Media
   import Web.Hikaru.Route
   import Web.Hikaru.Types

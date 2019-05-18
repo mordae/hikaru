@@ -66,7 +66,7 @@ library:
     - Web.Hikaru.Dispatch
     - Web.Hikaru.Form
     - Web.Hikaru.Link
-    - Web.Hikaru.Locale
+    - Web.Hikaru.Localize
     - Web.Hikaru.Media
     - Web.Hikaru.Route
     - Web.Hikaru.Types

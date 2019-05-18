@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Locale
+Module      :  Web.Hikaru.Localize
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -57,7 +57,7 @@ getSampleR flag = do
 @
 -}
 
-module Web.Hikaru.Locale
+module Web.Hikaru.Localize
   ( Locale
   , Localized(..)
   , lc_
