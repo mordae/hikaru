@@ -11,8 +11,6 @@ This module provides path matching with parameter extraction
 as well as content negotiation through path quality scoring.
 -}
 
-{-# LANGUAGE DeriveFunctor #-}
-
 module Web.Hikaru.Route
   (
   -- * Route Selection
@@ -89,8 +87,9 @@ where
 
     (<*>) rf rx = Route \env ->
       case runRoute rf env of
-        (env', Nothing) -> (env', Nothing)
         (env', Just f)  -> runRoute (fmap f rx) env'
+        (env', Nothing) -> case runRoute rx env' of
+                             (env'', _) -> (env'', Nothing)
 
 
   -- |
