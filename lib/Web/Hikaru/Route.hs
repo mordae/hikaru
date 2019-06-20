@@ -24,8 +24,9 @@ module Web.Hikaru.Route
   , rest
 
   -- ** Route Scoring
-  , score
   , vary
+  , score
+  , Score(..)
 
   -- *** Method
   , method
@@ -52,7 +53,6 @@ module Web.Hikaru.Route
 
   -- ** Types
   , Route
-  , Result(..)
   )
 where
   import BasePrelude hiding (head, delete)
@@ -100,7 +100,7 @@ where
       { envPath        :: [Text]
         -- ^ Remaining path segments to consume during matching.
 
-      , envScoring     :: [Request -> Result]
+      , envScoring     :: [Request -> Score]
         -- ^ Registered scoring functions to select the best handler.
 
       , envVary        :: [HeaderName]
@@ -109,33 +109,33 @@ where
 
 
   -- |
-  -- Route matching result.
+  -- Route scoring result.
   --
-  -- Results are ordered in the descending order of preference.
+  -- Scores are ordered in the descending order of preference.
   --
   -- Route matching results in the worst result encountered in the route.
-  -- Dispatcher then selects the route with the best result overall.
-  -- Best result does not necessarily mean a successfull one.
+  -- Dispatcher then selects the route with the best score overall.
+  -- Best match does not necessarily mean a successfull one, though.
   --
-  data Result
-    = Success !Float
-    | Failure !RequestError Text
+  data Score
+    = Suitable !Float
+    | Unsuitable !RequestError Text
     deriving (Eq, Ord)
 
 
   -- |
-  -- Concatenating two results produces the worse one.
-  -- If both are a success, the quality is multiplied.
+  -- Concatenating two scores produces the worse one.
+  -- If both are suitable, the quality is multiplied.
   --
-  instance Semigroup Result where
-    (Success x) <> (Success y) = Success (x * y)
+  instance Semigroup Score where
+    (Suitable x) <> (Suitable y) = Suitable (x * y)
     x <> y = max x y
 
   -- |
-  -- Results form a monoid with Success as the neutral element.
+  -- Results form a monoid with 'Suitable' as the neutral element.
   --
-  instance Monoid Result where
-    mempty = Success 1.0
+  instance Monoid Score where
+    mempty = Suitable 1.0
 
 
   -- |
@@ -193,10 +193,10 @@ where
   scoreResult :: Env -> a -> Request -> RouteResult a
   scoreResult Env{..} x req =
     case mconcat (map (req &) envScoring) of
-      Failure exn msg -> RouteFailed exn msg envVary
-      Success score'  -> if score' <= 0.0
-                           then RouteFailed NotAcceptable "" envVary
-                           else RouteSuccess x score' envVary
+      Unsuitable exn msg -> RouteFailed exn msg envVary
+      Suitable   score'  -> if score' <= 0.0
+                               then RouteFailed NotAcceptable "" envVary
+                               else RouteSuccess x score' envVary
 
 
   -- |
@@ -270,7 +270,7 @@ where
   -- |
   -- Score route with respect to the request using the supplied function.
   --
-  score :: (Request -> Result) -> Route ()
+  score :: (Request -> Score) -> Route ()
   score fn =
     Route \env@Env{..} ->
       (env { envScoring = fn : envScoring }, Just ())
@@ -302,8 +302,8 @@ where
   method :: Method -> Route ()
   method meth = score \req ->
     if meth == requestMethod req
-       then Success 1.0
-       else Failure MethodNotAllowed ""
+       then Suitable 1.0
+       else Unsuitable MethodNotAllowed ""
 
 
   -- |
@@ -358,8 +358,8 @@ where
     vary [hContentType] <* score \req ->
       let header = parseMedia (cs $ getContentType req)
        in case selectMedia media header of
-            Nothing -> Failure UnsupportedMediaType ""
-            Just md -> Success (mediaQuality md)
+            Nothing -> Unsuitable UnsupportedMediaType ""
+            Just md -> Suitable (mediaQuality md)
 
 
   -- |
@@ -389,8 +389,8 @@ where
     vary [hAccept] <* score \req ->
       let header = parseMedia (cs $ getAccept req)
        in case selectMedia media header of
-            Nothing -> Failure NotAcceptable ""
-            Just md -> Success (mediaQuality md)
+            Nothing -> Unsuitable NotAcceptable ""
+            Just md -> Suitable (mediaQuality md)
 
 
   -- |
@@ -423,8 +423,8 @@ where
     vary [hAcceptCharset] <* score \req ->
       let header = parseMedia (cs $ getAcceptCharset req)
        in case selectMedia media header of
-            Nothing -> Failure NotAcceptable ""
-            Just md -> Success (mediaQuality md)
+            Nothing -> Unsuitable NotAcceptable ""
+            Just md -> Suitable (mediaQuality md)
 
 
   -- |
@@ -436,8 +436,8 @@ where
     vary [hAcceptEncoding] <* score \req ->
       let header = parseMedia (cs $ getAcceptEncoding req)
        in case selectMedia media header of
-            Nothing -> Failure NotAcceptable ""
-            Just md -> Success (mediaQuality md)
+            Nothing -> Unsuitable NotAcceptable ""
+            Just md -> Suitable (mediaQuality md)
 
 
   -- |
@@ -449,8 +449,8 @@ where
     vary [hAcceptLanguage] <* score \req ->
       let header = parseMedia (cs $ getAcceptLanguage req)
        in case selectMedia media header of
-            Nothing -> Failure NotAcceptable ""
-            Just md -> Success (mediaQuality md)
+            Nothing -> Unsuitable NotAcceptable ""
+            Just md -> Suitable (mediaQuality md)
 
 
 
