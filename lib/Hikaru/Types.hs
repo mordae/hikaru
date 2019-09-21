@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Types
+Module      :  Hikaru.Types
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -10,7 +10,7 @@ Portability :  non-portable (ghc)
 This module provides types common for multiple other modules.
 -}
 
-module Web.Hikaru.Types
+module Hikaru.Types
   ( FromParam(..)
   , ToParam(..)
   , RequestError(..)
@@ -182,7 +182,7 @@ where
 
 
   -- |
-  -- Errors used both by "Web.Hikaru.Action" and "Web.Hikaru.Route"
+  -- Errors used both by "Hikaru.Action" and "Hikaru.Route"
   -- to report problems with the requests sent by the user.
   --
   -- Order by the severity from the least to the most severe.

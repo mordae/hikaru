@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Route
+Module      :  Hikaru.Route
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -11,7 +11,7 @@ This module provides path matching with parameter extraction
 as well as content negotiation through path quality scoring.
 -}
 
-module Web.Hikaru.Route
+module Hikaru.Route
   (
   -- * Route Selection
     selectRoute
@@ -63,8 +63,8 @@ where
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method (Method)
   import Network.Wai
-  import Web.Hikaru.Media
-  import Web.Hikaru.Types
+  import Hikaru.Media
+  import Hikaru.Types
 
 
   -- |

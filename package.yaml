@@ -36,6 +36,7 @@ default-extensions:
   - RecordWildCards
   - ScopedTypeVariables
   - StandaloneDeriving
+  - DataKinds
 
 dependencies:
   - aeson              >= 1.4  && <1.5
@@ -61,14 +62,14 @@ library:
   dependencies: []
 
   exposed-modules:
-    - Web.Hikaru
-    - Web.Hikaru.Action
-    - Web.Hikaru.Dispatch
-    - Web.Hikaru.Form
-    - Web.Hikaru.Link
-    - Web.Hikaru.Localize
-    - Web.Hikaru.Media
-    - Web.Hikaru.Route
-    - Web.Hikaru.Types
+    - Hikaru
+    - Hikaru.Action
+    - Hikaru.Dispatch
+    - Hikaru.Form
+    - Hikaru.Link
+    - Hikaru.Localize
+    - Hikaru.Media
+    - Hikaru.Route
+    - Hikaru.Types
 
 # EOF

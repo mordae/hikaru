@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Dispatch
+Module      :  Hikaru.Dispatch
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -10,7 +10,7 @@ Portability :  non-portable (ghc)
 This module provides monad-based request dispatching.
 -}
 
-module Web.Hikaru.Dispatch
+module Hikaru.Dispatch
   ( dispatch
 
   -- ** Routes
@@ -41,8 +41,8 @@ where
   import Data.Text (Text)
   import Network.HTTP.Types.Header
   import Network.Wai
-  import Web.Hikaru.Route
-  import Web.Hikaru.Types
+  import Hikaru.Route
+  import Hikaru.Types
 
 
   -- |
@@ -199,7 +199,7 @@ where
   -- @
   -- app :: Application
   -- app = 'dispatch' runAction $ do
-  --   'wrapRoutes' ('Web.Hikaru.Action.defaultHeader' hCacheControl "no-cache" >>)
+  --   'wrapRoutes' ('Hikaru.Action.defaultHeader' hCacheControl "no-cache" >>)
   --
   --   'route' $ getRootR  \<$ 'get'
   --   'route' $ getHelloR \<$ 'get' <* 'seg' "hello" \<*\> 'arg'

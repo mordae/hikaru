@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 137f697c69bc978fa0edf845d6ab4d71c1759e216cdb95f6b6c3f45c212ad639
+-- hash: ec8f75c55cd1cdb48ba2e77fa77a1586494297b85c9582601ebecf2c5e230fdb
 
 name:           hikaru
 version:        0.1.0.0
@@ -32,20 +32,20 @@ source-repository head
 
 library
   exposed-modules:
-      Web.Hikaru
-      Web.Hikaru.Action
-      Web.Hikaru.Dispatch
-      Web.Hikaru.Form
-      Web.Hikaru.Link
-      Web.Hikaru.Localize
-      Web.Hikaru.Media
-      Web.Hikaru.Route
-      Web.Hikaru.Types
+      Hikaru
+      Hikaru.Action
+      Hikaru.Dispatch
+      Hikaru.Form
+      Hikaru.Link
+      Hikaru.Localize
+      Hikaru.Media
+      Hikaru.Route
+      Hikaru.Types
   other-modules:
       Paths_hikaru
   hs-source-dirs:
       lib
-  default-extensions: BlockArguments DeriveGeneric FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving
+  default-extensions: BlockArguments DeriveGeneric FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving DataKinds
   ghc-options: -Wall -Wcompat
   build-depends:
       aeson >=1.4 && <1.5

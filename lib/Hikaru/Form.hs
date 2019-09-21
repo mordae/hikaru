@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Form
+Module      :  Hikaru.Form
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -10,7 +10,7 @@ Portability :  non-portable (ghc)
 This module provides tools to simplify form building and parsing.
 -}
 
-module Web.Hikaru.Form
+module Hikaru.Form
   ( Form
   , FormHandler
   , handleForm
@@ -28,8 +28,8 @@ where
   import Data.ByteString.Builder (toLazyByteString)
   import Data.Text (Text)
   import Lucid
-  import Web.Hikaru.Action
-  import Web.Hikaru.Types
+  import Hikaru.Action
+  import Hikaru.Types
 
 
   -- |

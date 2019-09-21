@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Media
+Module      :  Hikaru.Media
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -12,7 +12,7 @@ in the headers such as @Accept@, @Accept-Charset@, @Accept-Encoding@ and
 @Accept-Language@.
 -}
 
-module Web.Hikaru.Media
+module Hikaru.Media
   ( Media(..)
 
     -- * Parsing

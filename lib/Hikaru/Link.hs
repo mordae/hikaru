@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Link
+Module      :  Hikaru.Link
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -10,7 +10,7 @@ Portability :  non-portable (ghc)
 This module provides various ways to build local links.
 -}
 
-module Web.Hikaru.Link
+module Hikaru.Link
   ( makeLink
   , deriveLink
 
@@ -28,7 +28,7 @@ where
   import Data.Text (Text)
   import Lucid
   import Network.HTTP.Types.URI
-  import Web.Hikaru.Action
+  import Hikaru.Action
 
 
   -- |

@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Action
+Module      :  Hikaru.Action
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -11,7 +11,7 @@ This module provides a monad for reacting to user requests by
 building responses.
 -}
 
-module Web.Hikaru.Action
+module Hikaru.Action
   ( MonadAction(..)
 
   -- ** Inspecting Request
@@ -116,8 +116,8 @@ where
   import Network.Wai.Internal (getRequestBodyChunk)
   import Network.Wai.Parse
   import Web.Cookie
-  import Web.Hikaru.Media
-  import Web.Hikaru.Types
+  import Hikaru.Media
+  import Hikaru.Types
 
 
   -- |
@@ -1007,7 +1007,7 @@ where
   -- when localizing the result of the action.
   --
   -- Languages must be set using the 'setLanguages' function or through
-  -- the localization tools found in the "Web.Hikaru.Locale" module.
+  -- the localization tools found in the "Hikaru.Locale" module.
   --
   getLanguages :: (MonadAction m) => m [Text]
   getLanguages = getActionField aeLanguages

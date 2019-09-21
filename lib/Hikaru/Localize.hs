@@ -1,5 +1,5 @@
 {-|
-Module      :  Web.Hikaru.Localize
+Module      :  Hikaru.Localize
 Copyright   :  Jan Hamal Dvořák
 License     :  AGPL-3
 
@@ -39,10 +39,10 @@ instance Localized SampleMessages where
 Next, create a preferred language list for every action:
 
 @
-'Web.Hikaru.Dispatch.dispatch' runAction $ do
-  'Web.Hikaru.Dispatch.wrapActions' ('selectLanguages' \"lang\" \"lang\" >>)
+'Hikaru.Dispatch.dispatch' runAction $ do
+  'Hikaru.Dispatch.wrapActions' ('selectLanguages' \"lang\" \"lang\" >>)
 
-  'Web.Hikaru.Dispatch.route' ...
+  'Hikaru.Dispatch.route' ...
 @
 
 Finally, you can use your catalog when rendering pages:
@@ -57,7 +57,7 @@ getSampleR flag = do
 @
 -}
 
-module Web.Hikaru.Localize
+module Hikaru.Localize
   ( Locale
   , Localized(..)
   , lc_
@@ -69,8 +69,8 @@ where
   import Data.String.Conversions
   import Data.Text (Text)
   import Lucid
-  import Web.Hikaru.Action
-  import Web.Hikaru.Media
+  import Hikaru.Action
+  import Hikaru.Media
 
 
   -- |

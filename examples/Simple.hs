@@ -26,7 +26,7 @@ where
   import Network.Wai
   import Network.Wai.Handler.Warp
   import Network.Wai.Middleware.RequestLogger
-  import Web.Hikaru
+  import Hikaru
 
 
   -- Action ------------------------------------------------------------------
