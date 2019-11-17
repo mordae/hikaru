@@ -80,6 +80,9 @@ where
   instance FromParam Double where
     fromParam = readMaybe . unpack
 
+  instance FromParam () where
+    fromParam _ = Just ()
+
   instance FromParam Bool where
     fromParam "true"  = Just True
     fromParam "True"  = Just True
@@ -157,6 +160,9 @@ where
 
   instance ToParam Double where
     toParam = pack . show
+
+  instance ToParam () where
+    toParam _ = ""
 
   instance ToParam Bool where
     toParam True  = "true"
