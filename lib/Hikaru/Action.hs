@@ -370,9 +370,9 @@ where
   -- on the fly to the target type. Parsing failure maps to 'Nothing'.
   --
   getParamMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
-  getParamMaybe n = lookup n <$> getParams
-                    >>= \case Nothing  -> return $ Nothing
-                              Just val -> return $ fromParam val
+  getParamMaybe n = do
+    value <- lookup n <$> getParams
+    return $ fromParam =<< value
 
 
   -- |
@@ -410,9 +410,9 @@ where
   -- Parsing failure maps to 'Nothing'.
   --
   getCookieMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
-  getCookieMaybe n = lookup n <$> getCookies
-                     >>= \case Nothing  -> return $ Nothing
-                               Just val -> return $ fromParam val
+  getCookieMaybe n = do
+    value <- lookup n <$> getCookies
+    return $ fromParam =<< value
 
 
   -- |
@@ -622,9 +622,9 @@ where
   -- Parsing failure maps to 'Nothing'.
   --
   getFieldMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
-  getFieldMaybe n = lookup n <$> getFields
-                    >>= \case Nothing  -> return $ Nothing
-                              Just val -> return $ fromParam val
+  getFieldMaybe n = do
+    value <- lookup n <$> getFields
+    return $ fromParam =<< value
 
 
   -- |
@@ -658,8 +658,6 @@ where
   --
   getFileMaybe :: (MonadAction m) => Text -> m (Maybe (FileInfo FilePath))
   getFileMaybe n = lookup n <$> getFiles
-                    >>= \case Nothing  -> return $ Nothing
-                              Just val -> return $ Just val
 
 
   -- |
