@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.28.2.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ec8f75c55cd1cdb48ba2e77fa77a1586494297b85c9582601ebecf2c5e230fdb
+-- hash: b5ce075070487e21e8dc52b2afc5f1995311580f4978d92703fc77c3208c217c
 
 name:           hikaru
 version:        0.1.0.0
@@ -22,7 +24,6 @@ copyright:      Jan Hamal Dvořák
 license:        AGPL-3
 license-file:   LICENSE.md
 build-type:     Simple
-cabal-version:  >= 1.10
 extra-source-files:
     README.md
 
@@ -45,7 +46,7 @@ library
       Paths_hikaru
   hs-source-dirs:
       lib
-  default-extensions: BlockArguments DeriveGeneric FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving DataKinds
+  default-extensions: ApplicativeDo BlockArguments DeriveGeneric FlexibleInstances GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving DataKinds
   ghc-options: -Wall -Wcompat
   build-depends:
       aeson >=1.4 && <1.5

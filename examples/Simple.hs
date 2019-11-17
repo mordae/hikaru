@@ -14,19 +14,23 @@ Simple /= Easy /= Short. Happy reading.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 module Simple (main)
 where
+  import Prelude
   import Control.Concurrent.MVar
   import Control.Monad.Reader
+  import Data.Maybe
   import Data.Text (Text)
+  import Hikaru
   import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import Network.Wai
   import Network.Wai.Handler.Warp
   import Network.Wai.Middleware.RequestLogger
-  import Hikaru
 
 
   -- Action ------------------------------------------------------------------
@@ -99,22 +103,23 @@ where
       -- Plug in a cool logging middleware.
       middleware $ logStdoutDev
 
-      -- Enable 300s cache for the static endpoints.
-      wrapAction (defaultHeader hCacheControl "public, max-age=300" >>) $ do
-        -- Negotiate content for the root page.
-        route $ getRootHtmlR <$ get <* offerHTML
-        route $ getRootTextR <$ get <* offerText
+      -- Negotiate content for the root page.
+      route $ getRootHtmlR <$ get <* offerHTML
+      route $ getRootTextR <$ get <* offerText
 
       -- Disable caching for all the following endpoints.
-      wrapActions (defaultHeader hCacheControl "no-store" >>)
+      wrapAction (defaultHeader hCacheControl "no-store" >>) $ do
+        -- Return search results and repeat the form.
+        route $ getSearchHtmlR <$ get <* seg "search"
+                               <* offerHTML
 
-      -- Present a simple greeting page.
-      route $ getHelloR <$ get <* seg "hello" <*> arg
-                        <* offerText
+        -- Present a simple greeting page.
+        route $ getHelloR <$ get <* seg "hello" <*> arg
+                          <* offerText
 
-      -- Create an echoing JSON API.
-      route $ postEchoR <$ post <* seg "api" <* seg "echo"
-                        <* offerJSON <* acceptJSON
+        -- Create an echoing JSON API.
+        route $ postEchoR <$ post <* seg "api" <* seg "echo"
+                          <* offerJSON <* acceptJSON
 
 
   -- Handlers ----------------------------------------------------------------
@@ -129,6 +134,54 @@ where
     sendHTML $ do
       h1_ "Welcome!"
       p_ $ "You are " >> toHtml (show n) >> ". visitor!"
+
+      form_ [action_ "/search", method_ "GET"] $ do
+        view <- newForm "search" $ searchForm (Just "meaning of life")
+        formView_ view
+
+
+  getSearchHtmlR :: Action ()
+  getSearchHtmlR = do
+    sendHTML $ do
+      (maybeQuery, view) <- getForm "search" (searchForm Nothing)
+
+      h1_ "Search results"
+      form_ [method_ "GET"] $ do
+        formView_ view
+
+      case maybeQuery of
+        Nothing -> ""
+        Just q -> do
+          hr_ []
+          h2_ $ toHtml q
+          p_ "Sorry, no results found!"
+
+
+  searchForm :: (Monad m) => Maybe Text -> FormT Text m (Maybe Text)
+  searchForm q = do
+     q' <- inputField "q" "Query" q
+     _  <- button "search" "Search"
+     return q'
+
+
+  formView_ :: (MonadAction m, Localized l) => FormView l -> HtmlT m ()
+  formView_ view = do
+    forM_ (formElements view) $ \element ->
+      case element of
+        Button{..} -> do
+          button_ [ id_ elemName
+                  , name_ elemName
+                  ] $ lc_ elemLabel
+
+        InputField{..} -> do
+          label_ [ for_ elemName ] $ do
+            lc_ elemLabel
+            ":"
+
+          input_ [ id_ elemName
+                 , name_ elemName
+                 , value_ (fromMaybe "" elemValue)
+                 ]
 
 
   getRootTextR :: Action ()

@@ -6,149 +6,197 @@ License     :  AGPL-3
 Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
 Portability :  non-portable (ghc)
-
-This module provides tools to simplify form building and parsing.
 -}
 
 module Hikaru.Form
-  ( Form
-  , FormHandler
-  , handleForm
-
-  -- ** Inputs
-  , formInput
-  , formMultiple
-  , formOptions
-  , selectedOption
-  , selectedOptions
+  ( FormData
+  , FormView(..)
+  , FormElement(..)
+  , FormNote(..)
+  , FormT
+  , newForm
+  , getForm
+  , postForm
+  , button
+  , inputField
   )
 where
-  import BasePrelude
+  import BasePrelude hiding (length)
 
-  import Data.ByteString.Builder (toLazyByteString)
   import Data.Text (Text)
-  import Lucid
   import Hikaru.Action
   import Hikaru.Types
+  import Control.Monad.State
+  import Control.Monad.Reader
+
+
+  type FormData = ([(Text, Text)], [(Text, FileInfo FilePath)])
+
+
+  data FormView l
+    = FormView
+      { formElements   :: [FormElement l]
+      , formNotes      :: [FormNote l]
+      }
+
+  emptyFormView :: FormView l
+  emptyFormView = FormView { formElements = []
+                           , formNotes    = []
+                           }
+
+
+  data FormElement l
+    = Button
+      { elemName       :: Text
+      , elemLabel      :: l
+      }
+    | InputField
+      { elemName       :: Text
+      , elemLabel      :: l
+      , elemValue      :: Maybe Text
+      , elemNotes      :: [FormNote l]
+      }
+
+
+  data FormNote l
+    = NoteError
+      { noteLabel      :: l
+      }
+    | NoteNeutral
+      { noteLabel      :: l
+      }
+    | NoteSuccess
+      { noteLabel      :: l
+      }
+    deriving (Eq, Ord)
+
+
+  newtype FormT l m a
+    = FormT
+      { unFormT        :: ReaderT Env (StateT (FormView l) m) a
+      }
+    deriving (Functor, Applicative, Monad)
+
+
+  data Env
+    = Env
+      { envPrefix      :: [Text]
+      , envParams      :: [(Text, Text)]
+      , envFiles       :: [(Text, FileInfo FilePath)]
+      , envRunChecks   :: Bool
+      }
+
+  emptyEnv :: Env
+  emptyEnv = Env { envPrefix    = []
+                 , envParams    = []
+                 , envFiles     = []
+                 , envRunChecks = False
+                 }
 
 
   -- |
-  -- HTML form with a potentially parsed object.
+  -- Build an unchecked form.
   --
-  type Form m a = HtmlT m (Maybe a)
+  newForm :: (MonadAction m) => Text -> FormT l m a -> m (FormView l)
+  newForm name form = do
+    let env = emptyEnv { envPrefix = [name] }
+    (_, view) <- runForm env form
+    return view
 
 
   -- |
-  -- Function that takes either a form to present to the user or
-  -- a fully parsed object to somehow handle.
+  -- Build & process a checked form with parameters in the query string.
   --
-  type FormHandler m a = Either (HtmlT m ()) a -> m ()
+  getForm :: (MonadAction m) => Text -> FormT l m a -> m (a, FormView l)
+  getForm name form = do
+    params <- getParams
+
+    let env = emptyEnv { envPrefix    = [name]
+                       , envParams    = params
+                       , envRunChecks = True
+                       }
+
+    runForm env form
 
 
   -- |
-  -- Simplifies handling form submissions.
+  -- Build & process a checked form with parameters in the form fields.
   --
-  -- Example:
-  --
-  -- @
-  -- handleForm someForm \\case
-  --   Left incompleteForm -> do
-  --     sendHTML do
-  --       genericPage_ \"Nice Form\" $ do
-  --         incompleteForm
-  --
-  --   Right entry -> do
-  --     processEntry entry
-  --     redirect \"\/entries\/\"
-  -- @
-  --
-  handleForm :: (Monad m) => Form m a -> FormHandler m a -> m ()
-  handleForm form decide = do
-    (mb, mx) <- runHtmlT form
+  postForm :: (MonadAction m) => Text -> FormT l m a -> m (a, FormView l)
+  postForm name form = do
+    fields <- getFields
+    files  <- getFiles
 
-    case mx of
-      -- A little hack to get both the HtmlT and its value and shield the
-      -- caller from 'Builder' and 'toHtmlRaw'.
-      Nothing -> decide $ Left (toHtmlRaw $ toLazyByteString $ mb mempty)
-      Just x  -> decide $ Right x
+    let env = emptyEnv { envPrefix    = [name]
+                       , envParams    = fields
+                       , envFiles     = files
+                       , envRunChecks = True
+                       }
+
+    runForm env form
 
 
   -- |
-  -- Read a single form @\<input\>@ field as both the original text and the
-  -- converted value.
+  -- Unwrap the transformer stack and run the form.
   --
-  -- Return 'Nothing' if the request was submitted using one of the HTTP
-  -- methods that do not support request bodies (such as @GET@ or @HEAD@).
-  --
-  formInput :: (MonadAction m, FromParam a) => Text -> m (Text, Maybe a)
-  formInput name = do
-    caseMethod ("", Nothing) do
-      text  <- fromMaybe "" <$> getFieldMaybe name
-      return (text, fromParam text)
+  runForm :: (MonadAction m) => Env -> FormT l m a -> m (a, FormView l)
+  runForm env form = runStateT (runReaderT (unFormT form) env) emptyFormView
 
 
-  -- |
-  -- Read multiple form @\<input\>@ fields as both the original texts and the
-  -- converted values.
-  --
-  -- Return empty list if the request was submitted using one of the HTTP
-  -- methods that do not support request bodies (such as @GET@ or @HEAD@).
-  --
-  formMultiple :: (MonadAction m, FromParam a) => Text -> m [(Text, a)]
-  formMultiple name = do
-    caseMethod [] do
-      getFieldList name
-      <&> mapMaybe \x -> case fromParam x of
-                           Nothing -> Nothing
-                           Just v  -> Just (x, v)
+  button :: (Monad m) => Text -> l -> FormT l m Bool
+  button name label = do
+    value    <- formParamMaybe name
+    fullName <- makeName name
+
+    appendElement $ Button { elemName  = fullName
+                           , elemLabel = label
+                           }
+
+    case value of
+      Nothing -> return False
+      Just () -> return True
 
 
-  -- |
-  -- Read selected @\<option\>@ fields and return a list of all available
-  -- fields along with their selection status.
-  --
-  formOptions :: (MonadAction m, FromParam a, ToParam a, Eq a)
-              => Text -> [a] -> m [(Text, a, Bool)]
-  formOptions name options = do
-    found <- caseMethod [] (getFieldList name)
-    return $ flip map options \v -> (toParam v, v, v `elem` found)
+  inputField :: (Monad m, ToParam a, FromParam a)
+             => Text -> l -> Maybe a -> FormT l m (Maybe a)
+  inputField name label value = do
+    fullName <- makeName name
+    value'   <- formParamMaybe fullName
+
+    appendElement $ InputField { elemName  = fullName
+                               , elemLabel = label
+                               , elemValue = value' <|> fmap toParam value
+                               , elemNotes = []
+                               }
+
+    formParamMaybe fullName
 
 
-  -- |
-  -- Return the first selected value in the option list returned by
-  -- 'formOptions'.
-  --
-  selectedOption :: [(Text, a, Bool)] -> Maybe a
-  selectedOption = listToMaybe . selectedOptions
+  -- Form Internals ---------------------------------------------------------
 
 
-  -- |
-  -- Return all selected values in the option list returned by
-  -- 'formOptions'.
-  --
-  selectedOptions :: [(Text, a, Bool)] -> [a]
-  selectedOptions = mapMaybe (\(_, v, s) -> if s then Just v else Nothing)
+  appendElement :: (Monad m) => FormElement l -> FormT l m ()
+  appendElement element = FormT do
+    view@FormView{formElements} <- get
+    put $ view { formElements = formElements <> [element] }
 
 
-  -- Helper Functions --------------------------------------------------------
+  formParamMaybe :: (Monad m, FromParam a) => Text -> FormT l m (Maybe a)
+  formParamMaybe name = FormT do
+    Env{envParams} <- ask
+    return $ fromParam =<< lookup name envParams
 
 
-  -- |
-  -- Run action only for methods that come with bodies.
-  -- Otherwise return the default value.
-  --
-  caseMethod :: (MonadAction m) => a -> m a -> m a
-  caseMethod dfl action = do
-    method <- getMethod
+  formFileMaybe :: (Monad m) => Text -> FormT l m (Maybe (FileInfo FilePath))
+  formFileMaybe name = FormT do
+    Env{envFiles} <- ask
+    return $ lookup name envFiles
 
-    case method of
-      "GET"     -> return dfl
-      "HEAD"    -> return dfl
-      "CONNECT" -> return dfl
-      "OPTIONS" -> return dfl
-      "TRACE"   -> return dfl
-      _else     -> action
 
+  makeName :: (Monad m) => Text -> FormT l m Text
+  makeName name = FormT do
+    Env{envPrefix} <- ask
+    return $ mconcat $ intersperse "." $ reverse (name : envPrefix)
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

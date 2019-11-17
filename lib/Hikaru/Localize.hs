@@ -90,7 +90,15 @@ where
     -- Return 'Nothing' if the locale is not supported.
     --
     localize :: (Monad m) => Locale -> a -> Maybe (HtmlT m ())
-    localize _lc _msg = Nothing
+    localize _lc = const Nothing
+
+
+  -- |
+  -- Instance to make 'Text' usable for interoperability and
+  -- gradual localization.
+  --
+  instance Localized Text where
+    localize _lc = Just . toHtml
 
 
   -- |
