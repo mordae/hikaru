@@ -9,8 +9,7 @@ Portability :  non-portable (ghc)
 -}
 
 module Hikaru.Form
-  ( FormData
-  , FormView(..)
+  ( FormView(..)
   , FormElement(..)
   , FormNote(..)
   , FormT
@@ -19,18 +18,19 @@ module Hikaru.Form
   , postForm
   , button
   , inputField
+  , hiddenField
+  , textField
+  , selectField
+  , multiSelectField
   )
 where
-  import BasePrelude hiding (length)
+  import BasePrelude
 
+  import Control.Monad.Reader
+  import Control.Monad.State
   import Data.Text (Text)
   import Hikaru.Action
   import Hikaru.Types
-  import Control.Monad.State
-  import Control.Monad.Reader
-
-
-  type FormData = ([(Text, Text)], [(Text, FileInfo FilePath)])
 
 
   data FormView l
@@ -39,22 +39,38 @@ where
       , formNotes      :: [FormNote l]
       }
 
-  emptyFormView :: FormView l
-  emptyFormView = FormView { formElements = []
-                           , formNotes    = []
-                           }
-
 
   data FormElement l
-    = Button
+    = HiddenField
+      { elemName       :: Text
+      , elemValue      :: Maybe Text
+      }
+    | Button
       { elemName       :: Text
       , elemLabel      :: l
+      , elemAttrs      :: [(Text, Dynamic)]
       }
     | InputField
       { elemName       :: Text
       , elemLabel      :: l
       , elemValue      :: Maybe Text
       , elemNotes      :: [FormNote l]
+      , elemAttrs      :: [(Text, Dynamic)]
+      }
+    | TextField
+      { elemName       :: Text
+      , elemLabel      :: l
+      , elemValue      :: Maybe Text
+      , elemNotes      :: [FormNote l]
+      , elemAttrs      :: [(Text, Dynamic)]
+      }
+    | SelectField
+      { elemName       :: Text
+      , elemLabel      :: l
+      , elemOptions    :: [(Text, l, Bool)]
+      , elemNotes      :: [FormNote l]
+      , elemAttrs      :: [(Text, Dynamic)]
+      , elemMulti      :: Bool
       }
 
 
@@ -99,8 +115,7 @@ where
   --
   newForm :: (MonadAction m) => Text -> FormT l m a -> m (FormView l)
   newForm name form = do
-    let env = emptyEnv { envPrefix = [name] }
-    (_, view) <- runForm env form
+    (_, view) <- runForm form emptyEnv { envPrefix = [name] }
     return view
 
 
@@ -111,12 +126,10 @@ where
   getForm name form = do
     params <- getParams
 
-    let env = emptyEnv { envPrefix    = [name]
-                       , envParams    = params
-                       , envRunChecks = True
-                       }
-
-    runForm env form
+    runForm form emptyEnv { envPrefix    = [name]
+                          , envParams    = params
+                          , envRunChecks = True
+                          }
 
 
   -- |
@@ -127,31 +140,35 @@ where
     fields <- getFields
     files  <- getFiles
 
-    let env = emptyEnv { envPrefix    = [name]
-                       , envParams    = fields
-                       , envFiles     = files
-                       , envRunChecks = True
-                       }
-
-    runForm env form
+    runForm form emptyEnv { envPrefix    = [name]
+                          , envParams    = fields
+                          , envFiles     = files
+                          , envRunChecks = True
+                          }
 
 
   -- |
   -- Unwrap the transformer stack and run the form.
   --
-  runForm :: (MonadAction m) => Env -> FormT l m a -> m (a, FormView l)
-  runForm env form = runStateT (runReaderT (unFormT form) env) emptyFormView
+  runForm :: (MonadAction m) => FormT l m a -> Env -> m (a, FormView l)
+  runForm form env = runStateT (runReaderT (unFormT form) env)
+                               FormView { formElements = []
+                                        , formNotes    = []
+                                        }
+
 
 
   button :: (Monad m) => Text -> l -> FormT l m Bool
   button name label = do
-    value    <- formParamMaybe name
     fullName <- makeName name
 
-    appendElement $ Button { elemName  = fullName
-                           , elemLabel = label
-                           }
+    appendElement
+      Button { elemName  = fullName
+             , elemLabel = label
+             , elemAttrs = []
+             }
 
+    value <- formParamMaybe name
     case value of
       Nothing -> return False
       Just () -> return True
@@ -159,17 +176,97 @@ where
 
   inputField :: (Monad m, ToParam a, FromParam a)
              => Text -> l -> Maybe a -> FormT l m (Maybe a)
-  inputField name label value = do
-    fullName <- makeName name
-    value'   <- formParamMaybe fullName
+  inputField name label orig = do
+    fullName  <- makeName name
+    textValue <- formParamMaybe fullName
 
-    appendElement $ InputField { elemName  = fullName
-                               , elemLabel = label
-                               , elemValue = value' <|> fmap toParam value
-                               , elemNotes = []
-                               }
+    let textOrig = toParam <$> orig
+     in appendElement
+          InputField { elemName  = fullName
+                     , elemLabel = label
+                     , elemValue = textValue <|> textOrig
+                     , elemAttrs = []
+                     , elemNotes = []
+                     }
 
     formParamMaybe fullName
+
+
+  hiddenField :: (Monad m, ToParam a, FromParam a)
+              => Text -> Maybe a -> FormT l m (Maybe a)
+  hiddenField name orig = do
+    fullName  <- makeName name
+    textValue <- formParamMaybe fullName
+
+    let textOrig = toParam <$> orig
+     in appendElement
+          HiddenField { elemName  = fullName
+                      , elemValue = textValue <|> textOrig
+                      }
+
+    formParamMaybe fullName
+
+
+  textField :: (Monad m, ToParam a, FromParam a)
+            => Text -> l -> Maybe a -> FormT l m (Maybe a)
+  textField name label orig = do
+    fullName  <- makeName name
+    textValue <- formParamMaybe fullName
+
+    let textOrig = toParam <$> orig
+     in appendElement
+          TextField { elemName  = fullName
+                    , elemLabel = label
+                    , elemValue = textValue <|> textOrig
+                    , elemAttrs = []
+                    , elemNotes = []
+                    }
+
+    formParamMaybe fullName
+
+
+  selectField :: (Monad m, ToParam a, FromParam a, Eq a)
+              => Text -> l -> (a -> l) -> [a] -> Maybe a -> FormT l m (Maybe a)
+  selectField name label optlabel options orig = do
+    fullName  <- makeName name
+    value     <- formParamMaybe fullName
+
+    let textOptions = [ (toParam o, optlabel o, isSel o) | o <- options ]
+        isSel o     = Just o == (value <|> orig)
+     in appendElement
+          SelectField { elemName    = fullName
+                      , elemLabel   = label
+                      , elemOptions = textOptions
+                      , elemAttrs   = []
+                      , elemNotes   = []
+                      , elemMulti   = False
+                      }
+
+    case value of
+      Just v -> if v `elem` options
+                   then return value
+                   else return Nothing
+      Nothing -> return Nothing
+
+
+  multiSelectField :: (Monad m, ToParam a, FromParam a, Eq a)
+                   => Text -> l -> (a -> l) -> [a] -> [a] -> FormT l m [a]
+  multiSelectField name label optlabel options orig = do
+    fullName     <- makeName name
+    values       <- formParamList fullName
+
+    let textOptions = [ (toParam o, optlabel o, isSel o) | o <- options ]
+        isSel o     = o `elem` (values <|> orig)
+     in appendElement
+          SelectField { elemName     = fullName
+                      , elemLabel    = label
+                      , elemOptions  = textOptions
+                      , elemAttrs    = []
+                      , elemNotes    = []
+                      , elemMulti    = True
+                      }
+
+    return $ [ v | v <- values, v `elem` options ]
 
 
   -- Form Internals ---------------------------------------------------------
@@ -185,6 +282,12 @@ where
   formParamMaybe name = FormT do
     Env{envParams} <- ask
     return $ fromParam =<< lookup name envParams
+
+
+  formParamList :: (Monad m, FromParam a) => Text -> FormT l m [a]
+  formParamList name = FormT do
+    Env{envParams} <- ask
+    return $ mapMaybe (fromParam . snd) $ filter ((name ==) . fst) $ envParams
 
 
   formFileMaybe :: (Monad m) => Text -> FormT l m (Maybe (FileInfo FilePath))
