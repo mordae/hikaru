@@ -13,6 +13,7 @@ module Hikaru.Form
   , FormElement(..)
   , FormNote(..)
   , FormT
+  , Form
   , newForm
   , getForm
   , postForm
@@ -92,6 +93,9 @@ where
       { unFormT        :: ReaderT Env (StateT (FormView l) m) a
       }
     deriving (Functor, Applicative, Monad)
+
+
+  type Form l m a = Maybe a -> FormT l m (Maybe a)
 
 
   data Env
@@ -175,7 +179,7 @@ where
 
 
   inputField :: (Monad m, ToParam a, FromParam a)
-             => Text -> l -> Maybe a -> FormT l m (Maybe a)
+             => Text -> l -> Form l m a
   inputField name label orig = do
     fullName  <- makeName name
     textValue <- formParamMaybe fullName
@@ -193,7 +197,7 @@ where
 
 
   hiddenField :: (Monad m, ToParam a, FromParam a)
-              => Text -> Maybe a -> FormT l m (Maybe a)
+              => Text -> Form l m a
   hiddenField name orig = do
     fullName  <- makeName name
     textValue <- formParamMaybe fullName
@@ -208,7 +212,7 @@ where
 
 
   textField :: (Monad m, ToParam a, FromParam a)
-            => Text -> l -> Maybe a -> FormT l m (Maybe a)
+            => Text -> l -> Form l m a
   textField name label orig = do
     fullName  <- makeName name
     textValue <- formParamMaybe fullName
@@ -226,7 +230,7 @@ where
 
 
   selectField :: (Monad m, ToParam a, FromParam a, Eq a)
-              => Text -> l -> (a -> l) -> [a] -> Maybe a -> FormT l m (Maybe a)
+              => Text -> l -> (a -> l) -> [a] -> Form l m a
   selectField name label optlabel options orig = do
     fullName  <- makeName name
     value     <- formParamMaybe fullName
