@@ -31,10 +31,11 @@ module Hikaru.Form
   , multiSelectField'
   , opt
   , req
+  , whenChecking
+  , fieldShouldCheck
+  , fieldValue
   , addNote
   , addAttribute
-  , fieldCheck
-  , fieldValue
   , hasErrors
   )
 where
@@ -433,17 +434,11 @@ where
   --
   req :: (Monad m) => l -> FieldT l a m ()
   req label = do
-    shouldCheck <- fieldCheck
-
-    if shouldCheck
-       then do
-         value <- fieldValue
-         case value of
-           Nothing -> addNote $ NoteError label
-           Just _v -> return ()
-
-        else do
-          return ()
+    whenChecking do
+      value <- fieldValue
+      case value of
+        Nothing -> addNote $ NoteError label
+        Just _v -> return ()
 
 
   -- |
@@ -466,8 +461,20 @@ where
   -- |
   -- TODO
   --
-  fieldCheck :: (Monad m) => FieldT l a m Bool
-  fieldCheck = FieldT (fst <$> ask)
+  whenChecking :: (Monad m) => FieldT l a m b -> FieldT l a m ()
+  whenChecking checkField = do
+    check <- fieldShouldCheck
+
+    if check
+       then checkField >> return ()
+       else return ()
+
+
+  -- |
+  -- TODO
+  --
+  fieldShouldCheck :: (Monad m) => FieldT l a m Bool
+  fieldShouldCheck = FieldT (fst <$> ask)
 
 
   -- |
