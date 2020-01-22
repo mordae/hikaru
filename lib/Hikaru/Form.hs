@@ -43,7 +43,7 @@ where
 
   import Control.Monad.Reader
   import Control.Monad.State
-  import Data.Text (Text)
+  import Data.Text (Text, strip)
   import Hikaru.Action
   import Hikaru.Localize
   import Hikaru.Types
@@ -203,7 +203,7 @@ where
 
     let view = FormFields [] []
         env  = Env { envPrefix = [name]
-                   , envParams = filter (("" /=) . snd) params
+                   , envParams = filter (("" /=) . strip . snd) params
                    , envFiles  = []
                    , envCheck  = True
                    }
@@ -225,7 +225,7 @@ where
 
     let view = FormFields [] []
         env  = Env { envPrefix = [name]
-                   , envParams = filter (("" /=) . snd) fields
+                   , envParams = filter (("" /=) . strip . snd) fields
                    , envFiles  = files
                    , envCheck  = True
                    }
