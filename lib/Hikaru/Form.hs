@@ -14,6 +14,7 @@ module Hikaru.Form
   ( View(..)
   , FormNote(..)
   , Form
+  , FieldT
   , newForm
   , getForm
   , postForm
@@ -31,6 +32,7 @@ module Hikaru.Form
   , multiSelectField'
   , opt
   , req
+  , processValue
   , whenChecking
   , fieldShouldCheck
   , fieldValue
@@ -172,7 +174,7 @@ where
 
   newtype FieldT l a m b
     = FieldT
-      { unFieldT       :: ReaderT (Bool, Maybe a) (StateT (View l) m) b
+      { unFieldT       :: ReaderT Bool (StateT (View l, Maybe a) m) b
       }
     deriving (Monad, Applicative, Functor)
 
@@ -261,10 +263,10 @@ where
                              , viewAttrs = []
                              }
 
-    view' <- runFieldT field value' view
+    (view', value'') <- runFieldT field value' view
 
     modify (<> view')
-    return value'
+    return value''
 
 
   -- |
@@ -292,10 +294,10 @@ where
                             , viewAttrs = []
                             }
 
-    view' <- runFieldT field value' view
+    (view', value'') <- runFieldT field value' view
 
     modify (<> view')
-    return value'
+    return value''
 
 
   -- |
@@ -323,10 +325,10 @@ where
                           , viewAttrs = []
                           }
 
-    view' <- runFieldT field value' view
+    (view', value'') <- runFieldT field value' view
 
     modify (<> view')
-    return value'
+    return value''
 
 
   -- |
@@ -359,10 +361,10 @@ where
                              , viewMulti   = False
                              }
 
-    view' <- runFieldT field value' view
+    (view', value'') <- runFieldT field value' view
 
     modify (<> view')
-    return value'
+    return value''
 
 
   -- |
@@ -416,10 +418,10 @@ where
                              , viewMulti   = False
                              }
 
-    view' <- runFieldT field (Just found) view
+    (view', found') <- runFieldT field (Just found) view
 
     modify (<> view')
-    return $ Just found
+    return $ found'
 
 
   -- |
@@ -446,16 +448,29 @@ where
   --
   addNote :: (Monad m) => FormNote l -> FieldT l a m ()
   addNote note = FieldT do
-    modify \view -> view { viewNotes = viewNotes view <> [note] }
+    modify \(view, value) ->
+      ( view { viewNotes = viewNotes view <> [note] }
+      , value
+      )
 
 
   -- |
   -- TODO
   --
   addAttribute :: (Monad m, Typeable v) => Text -> v -> FieldT l a m ()
-  addAttribute name value = FieldT do
-    modify \view ->
-      view { viewAttrs = viewAttrs view <> [(name, toDyn value)] }
+  addAttribute name attr = FieldT do
+    modify \(view, value) ->
+      ( view { viewAttrs = viewAttrs view <> [(name, toDyn attr)] }
+      , value
+      )
+
+
+  -- |
+  -- TODO
+  --
+  processValue :: (Monad m) => (Maybe a -> Maybe a) -> FieldT l a m ()
+  processValue process = FieldT do
+    modify \(view, value) -> (view, process value)
 
 
   -- |
@@ -474,14 +489,14 @@ where
   -- TODO
   --
   fieldShouldCheck :: (Monad m) => FieldT l a m Bool
-  fieldShouldCheck = FieldT (fst <$> ask)
+  fieldShouldCheck = FieldT ask
 
 
   -- |
   -- TODO
   --
   fieldValue :: (Monad m) => FieldT l a m (Maybe a)
-  fieldValue = FieldT (snd <$> ask)
+  fieldValue = FieldT (snd <$> get)
 
 
   -- |
@@ -496,10 +511,10 @@ where
 
 
   runFieldT :: (Monad m) => FieldT l a m b -> Maybe a -> View l
-             -> FormT l m (View l)
+             -> FormT l m (View l, Maybe a)
   runFieldT field value view = do
     Env{envCheck} <- ask
-    lift $ execStateT (runReaderT (unFieldT field) (envCheck, value)) view
+    lift $ execStateT (runReaderT (unFieldT field) envCheck) (view, value)
 
 
   isErrorNote :: FormNote l -> Bool
