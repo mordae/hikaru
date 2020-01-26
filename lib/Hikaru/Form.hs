@@ -11,17 +11,19 @@ This module provides applicative form handling.
 -}
 
 module Hikaru.Form
-  ( View(..)
+  ( MonadCsrf(..)
+  , View(..)
   , FormNote(..)
   , Form
   , FieldT
   , newForm
   , getForm
   , postForm
-  , inputField
-  , inputField'
   , hiddenField
   , hiddenField'
+  , csrfTokenField
+  , inputField
+  , inputField'
   , textArea
   , textArea'
   , selectField
@@ -47,6 +49,7 @@ where
   import Control.Monad.State
   import Data.Text (Text, strip)
   import Hikaru.Action
+  import Hikaru.CSRF
   import Hikaru.Localize
   import Hikaru.Types
   import Lucid
@@ -132,13 +135,15 @@ where
     = FormT
       { unFormT        :: ReaderT (Env l) (StateT (View l) m) a
       }
-    deriving (Monad, Applicative, Functor)
+    deriving (MonadIO, Monad, Applicative, Functor)
 
   deriving instance (Monad m) => MonadReader (Env l) (FormT l m)
   deriving instance (Monad m) => MonadState (View l) (FormT l m)
 
   instance MonadTrans (FormT l) where
     lift = FormT . lift . lift
+
+  instance (MonadCsrf m) => MonadCsrf (FormT l m)
 
 
   newtype Form l m a
@@ -159,9 +164,6 @@ where
       r <- unFormR
       return $ l <*> r
 
-  instance MonadTrans (Form l) where
-    lift = Form . fmap Just . lift
-
 
   data Env l
     = Env
@@ -176,10 +178,12 @@ where
     = FieldT
       { unFieldT       :: ReaderT Bool (StateT (View l, Maybe a) m) b
       }
-    deriving (Monad, Applicative, Functor)
+    deriving (MonadIO, Monad, Applicative, Functor)
 
   instance MonadTrans (FieldT l a) where
     lift = FieldT . lift . lift
+
+  instance (MonadCsrf m) => MonadCsrf (FieldT l a m)
 
 
   -- |
@@ -237,6 +241,46 @@ where
     if hasErrors view'
        then return (view', Nothing)
        else return (view', value)
+
+
+  -- |
+  -- TODO
+  --
+{-
+  csrfTokenField :: (MonadCsrf m) => l -> Form l m Text
+  csrfTokenField msg = Form do
+    token <- generateToken
+
+    unForm $ hiddenField "_token" (Just token) do
+      whenChecking do
+        value <- fromMaybe "" <$> fieldValue
+        valid <- isTokenValid value
+
+        if valid
+           then return ()
+           else addNote $ NoteError msg
+-}
+
+
+  csrfTokenField :: (MonadCsrf m) => l -> Form l m Text
+  csrfTokenField msg = Form do
+    Env{envCheck} <- ask
+
+    name' <- makeName "csrftoken"
+    value <- fromMaybe "" <$> formParamMaybe name'
+    valid <- isTokenValid value
+    token <- generateToken
+
+    let view = HiddenField { viewName  = name'
+                           , viewValue = Just token
+                           , viewNotes = if envCheck && not valid
+                                            then [NoteError msg]
+                                            else []
+                           , viewAttrs = []
+                           }
+
+    modify (<> view)
+    return $ Just token
 
 
   -- |

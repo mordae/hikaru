@@ -24,8 +24,10 @@ extra-source-files: README.md
 ghc-options: -Wall -Wcompat
 default-extensions:
   - BlockArguments
+  - DefaultSignatures
   - FlexibleInstances
   - GeneralizedNewtypeDeriving
+  - GADTs
   - LambdaCase
   - MultiParamTypeClasses
   - NamedFieldPuns
@@ -45,6 +47,7 @@ dependencies:
   - case-insensitive   >= 1.2  && <1.3
   - containers         >= 0.6  && <0.7
   - cookie             >= 0.4  && <0.5
+  - cryptonite         >= 0.25 && <0.26
   - http-types         >= 0.12 && <0.13
   - lucid              >= 2.9  && <2.10
   - mtl                >= 2.2  && <2.3
@@ -52,6 +55,7 @@ dependencies:
   - string-conversions >= 0.4  && <0.5
   - text               >= 1.2  && <1.3
   - text-icu           >= 0.7  && <0.8
+  - time               >= 1.8  && <1.9
   - wai                >= 3.2  && <3.3
   - wai-extra          >= 3.0  && <3.1
 
@@ -62,6 +66,7 @@ library:
   exposed-modules:
     - Hikaru
     - Hikaru.Action
+    - Hikaru.CSRF
     - Hikaru.Dispatch
     - Hikaru.Form
     - Hikaru.Link

@@ -101,7 +101,7 @@ where
   import qualified Data.ByteString.Lazy as LBS
   import qualified Data.Text.Lazy as LT
 
-  import Control.Monad.Trans (lift)
+  import Control.Monad.Trans
   import Control.Monad.Trans.Resource
   import Data.Aeson (Value, ToJSON, encode, eitherDecode')
   import Data.Binary.Builder
@@ -137,11 +137,14 @@ where
     --
     getActionEnv :: m ActionEnv
 
+    default getActionEnv
+      :: (MonadTrans t, MonadAction n, m ~ t n) => m ActionEnv
+    getActionEnv = lift getActionEnv
+
   -- |
   -- Allow access to action when building HTML responses.
   --
-  instance (MonadAction m) => MonadAction (HtmlT m) where
-    getActionEnv = lift getActionEnv
+  instance (MonadAction m) => MonadAction (HtmlT m)
 
 
   -- |
