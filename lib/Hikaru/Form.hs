@@ -14,6 +14,7 @@ module Hikaru.Form
   ( MonadCsrf(..)
   , View(..)
   , FormNote(..)
+  , NoteLevel(..)
   , Form
   , FieldT
   , newForm
@@ -50,9 +51,7 @@ where
   import Data.Text (Text, strip)
   import Hikaru.Action
   import Hikaru.CSRF
-  import Hikaru.Localize
   import Hikaru.Types
-  import Lucid
 
 
   -- Form Types --------------------------------------------------------------
@@ -111,24 +110,25 @@ where
     mempty = FormFields [] []
 
 
+  -- |
+  -- TODO
+  --
   data FormNote l
-    = NoteError
-      { noteLabel      :: l
-      }
-    | NoteNeutral
-      { noteLabel      :: l
-      }
-    | NoteSuccess
-      { noteLabel      :: l
+    = FormNote
+      { noteLevel      :: NoteLevel
+      , noteLabel      :: l
       }
     deriving (Eq, Ord)
 
-  instance (ToHtml l) => ToHtml (FormNote l) where
-    toHtml    = toHtml . noteLabel
-    toHtmlRaw = toHtmlRaw . noteLabel
 
-  instance (Localized l) => Localized (FormNote l) where
-    localize lang = localize lang . noteLabel
+  -- |
+  -- TODO
+  --
+  data NoteLevel
+    = NoteError
+    | NoteNeutral
+    | NoteSuccess
+    deriving (Eq, Ord)
 
 
   newtype FormT l m a
@@ -274,7 +274,7 @@ where
     let view = HiddenField { viewName  = name'
                            , viewValue = Just token
                            , viewNotes = if envCheck && not valid
-                                            then [NoteError msg]
+                                            then [FormNote NoteError msg]
                                             else []
                            , viewAttrs = []
                            }
@@ -483,7 +483,7 @@ where
     whenChecking do
       value <- fieldValue
       case value of
-        Nothing -> addNote $ NoteError label
+        Nothing -> addNote $ FormNote NoteError label
         Just _v -> return ()
 
 
@@ -562,8 +562,8 @@ where
 
 
   isErrorNote :: FormNote l -> Bool
-  isErrorNote NoteError{} = True
-  isErrorNote _           = False
+  isErrorNote (FormNote NoteError _) = True
+  isErrorNote _else                  = False
 
 
   formParamMaybe :: (Monad m, FromParam a) => Text -> FormT l m (Maybe a)
