@@ -128,7 +128,13 @@ where
     = NoteError
     | NoteNeutral
     | NoteSuccess
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Show)
+
+  instance Semigroup NoteLevel where
+    (<>) = min
+
+  instance Monoid NoteLevel where
+    mempty = NoteSuccess
 
 
   newtype FormT l m a
