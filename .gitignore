@@ -1,4 +1,3 @@
 /cabal.*
 /dist/
 /.*/
-/stack.yaml.lock
