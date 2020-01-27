@@ -7,7 +7,8 @@ Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
 Portability :  non-portable (ghc)
 
-This module provides various ways to build local links.
+This module provides various ways to build local links and provide
+feedback based on the request path.
 -}
 
 module Hikaru.Link
@@ -18,6 +19,10 @@ module Hikaru.Link
   , lhref_
   , phref_
   , qhref_
+
+  -- ** Path Feedback
+  , isActivePath
+  , isActivePrefix
   )
 where
   import BasePrelude
@@ -94,6 +99,28 @@ where
   --
   qhref_ :: [(Text, Text)] -> Attribute
   qhref_ qs = href_ (makeLink [] qs)
+
+
+  -- Path Feedback -----------------------------------------------------------
+
+
+  -- |
+  -- Determine whether the supplied path is the one user has requested.
+  --
+  isActivePath :: (MonadAction m) => [Text] -> m Bool
+  isActivePath link = do
+    path <- getPathInfo
+    return $ link == path
+
+
+  -- |
+  -- Determine whether the supplied path is a prefix of the one user has
+  -- requested. Empty path components in the supplied path are ignored.
+  --
+  isActivePrefix :: (MonadAction m) => [Text] -> m Bool
+  isActivePrefix link = do
+    path <- getPathInfo
+    return $ isPrefixOf (filter (/= "") link) path
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
