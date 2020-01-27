@@ -80,8 +80,8 @@ module Hikaru.Action
   , throwError
 
   -- ** Localization
-  , setLanguages
   , getLanguages
+  , setLanguages
 
   -- ** Finalizing
   , registerFinalizer
@@ -427,7 +427,7 @@ where
 
 
   -- |
-  -- Returns HTTP @Referrer@ header or just @/@.
+  -- Obtain HTTP @Referrer@ header or just @/@.
   --
   -- Useful for redirects back to where the user came from.
   --
@@ -462,7 +462,7 @@ where
   -- just read until the limit is exceeded.
   --
   -- Precise enforcement is more expensive, so we may allow slightly
-  -- more (up to 32kb) than the limit set here where the request
+  -- more (up to 32kb) than the limit set here when the request
   -- length is not known beforehand.
   --
   setBodyLimit :: (MonadAction m) => Int64 -> m ()
@@ -994,7 +994,7 @@ where
 
 
   -- |
-  -- Same as 'throwError', but with a message.
+  -- Same an IO exception in the form of ('RequestError', 'Text').
   --
   throwError :: (MonadAction m) => RequestError -> Text -> m a
   throwError exn msg = liftIO $ throwIO (exn, msg)
@@ -1005,10 +1005,10 @@ where
 
   -- |
   -- Get list of languages in order of their preference to be used
-  -- when localizing the result of the action.
+  -- for localization.
   --
   -- Languages must be set using the 'setLanguages' function or through
-  -- the localization tools found in the "Hikaru.Locale" module.
+  -- the localization tools found in the "Hikaru.Localize" module.
   --
   getLanguages :: (MonadAction m) => m [Text]
   getLanguages = getActionField aeLanguages
