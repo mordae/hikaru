@@ -81,15 +81,18 @@ where
 
   instance Functor Route where
     fmap f r = Route \env -> fmap (fmap f) (runRoute r env)
+    {-# INLINE fmap #-}
 
   instance Applicative Route where
     pure x = Route \env -> (env, Just x)
+    {-# INLINE pure #-}
 
     (<*>) rf rx = Route \env ->
       case runRoute rf env of
         (env', Just f)  -> runRoute (fmap f rx) env'
         (env', Nothing) -> case runRoute rx env' of
                              (env'', _) -> (env'', Nothing)
+    {-# INLINE (<*>) #-}
 
 
   -- |
@@ -130,12 +133,14 @@ where
   instance Semigroup Score where
     (Suitable x) <> (Suitable y) = Suitable (x * y)
     x <> y = max x y
+    {-# INLINE (<>) #-}
 
   -- |
   -- Results form a monoid with 'Suitable' as the neutral element.
   --
   instance Monoid Score where
     mempty = Suitable 1.0
+    {-# INLINE mempty #-}
 
 
   -- |

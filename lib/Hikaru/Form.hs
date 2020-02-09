@@ -106,8 +106,11 @@ where
 
     v1 <> v2 = FormFields ([v1, v2]) []
 
+    {-# INLINE (<>) #-}
+
   instance Monoid (View l) where
     mempty = FormFields [] []
+    {-# INLINE mempty #-}
 
 
   -- |
@@ -132,9 +135,11 @@ where
 
   instance Semigroup NoteLevel where
     (<>) = min
+    {-# INLINE (<>) #-}
 
   instance Monoid NoteLevel where
     mempty = NoteSuccess
+    {-# INLINE mempty #-}
 
 
   newtype FormT l m a
@@ -148,6 +153,7 @@ where
 
   instance MonadTrans (FormT l) where
     lift = FormT . lift . lift
+    {-# INLINE lift #-}
 
   instance (MonadCsrf m) => MonadCsrf (FormT l m)
 
@@ -161,14 +167,17 @@ where
     fmap f Form{..} = Form do
       x <- unForm
       return $ fmap f x
+    {-# INLINE fmap #-}
 
   instance (Monad m) => Applicative (Form l m) where
     pure x = Form $ return $ Just x
+    {-# INLINE pure #-}
 
     Form{unForm = unFormL} <*> Form{unForm = unFormR} = Form do
       l <- unFormL
       r <- unFormR
       return $ l <*> r
+    {-# INLINE (<*>) #-}
 
 
   data Env l
@@ -188,6 +197,7 @@ where
 
   instance MonadTrans (FieldT l a) where
     lift = FieldT . lift . lift
+    {-# INLINE lift #-}
 
   instance (MonadCsrf m) => MonadCsrf (FieldT l a m)
 

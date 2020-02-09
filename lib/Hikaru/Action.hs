@@ -140,6 +140,7 @@ where
     default getActionEnv
       :: (MonadTrans t, MonadAction n, m ~ t n) => m ActionEnv
     getActionEnv = lift getActionEnv
+    {-# INLINE getActionEnv #-}
 
   -- |
   -- Allow access to action when building HTML responses.

@@ -27,6 +27,8 @@ where
   import Network.Wai
 
   import qualified Data.ByteString.Lazy
+  import qualified Data.Text.Encoding
+  import qualified Data.Text.Encoding.Error
   import qualified Data.Text.Lazy
 
 
@@ -40,48 +42,63 @@ where
 
   instance FromParam Int where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Int8 where
     fromParam = readMaybe . unpack
 
+    {-# INLINE fromParam #-}
   instance FromParam Int16 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Int32 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Int64 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Word where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Word8 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Word16 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Word32 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Word64 where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Integer where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Natural where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Float where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Double where
     fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam () where
     fromParam _ = Just ()
+    {-# INLINE fromParam #-}
 
   instance FromParam Bool where
     fromParam "true"  = Just True
@@ -89,26 +106,34 @@ where
     fromParam "false" = Just False
     fromParam "False" = Just False
     fromParam _else   = Nothing
+    {-# INLINE fromParam #-}
 
   instance FromParam Char where
     fromParam inp = case (unpack inp) of
                       [x]   -> Just x
                       _else -> Nothing
+    {-# INLINE fromParam #-}
 
   instance FromParam String where
     fromParam = Just . unpack
+    {-# INLINE fromParam #-}
 
   instance FromParam Text where
     fromParam = Just . id
+    {-# INLINE fromParam #-}
 
   instance FromParam Data.Text.Lazy.Text where
-    fromParam = Just . cs
+    fromParam = Just . Data.Text.Lazy.fromStrict
+    {-# INLINE fromParam #-}
 
   instance FromParam Data.ByteString.ByteString where
-    fromParam = Just . cs
+    fromParam = Just . Data.Text.Encoding.encodeUtf8
+    {-# INLINE fromParam #-}
 
   instance FromParam Data.ByteString.Lazy.ByteString where
-    fromParam = Just . cs
+    fromParam = Just . Data.ByteString.Lazy.fromStrict
+                     . Data.Text.Encoding.encodeUtf8
+    {-# INLINE fromParam #-}
 
 
   -- |
@@ -121,70 +146,95 @@ where
 
   instance ToParam Int where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Int8 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Int16 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Int32 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Int64 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Word where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Word8 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Word16 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Word32 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Word64 where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Integer where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Natural where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Float where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam Double where
     toParam = pack . show
+    {-# INLINE toParam #-}
 
   instance ToParam () where
     toParam _ = ""
+    {-# INLINE toParam #-}
 
   instance ToParam Bool where
     toParam True  = "true"
     toParam False = "false"
+    {-# INLINE toParam #-}
 
   instance ToParam Char where
     toParam char = pack [char]
+    {-# INLINE toParam #-}
 
   instance ToParam String where
     toParam = pack
+    {-# INLINE toParam #-}
 
   instance ToParam Text where
     toParam = id
+    {-# INLINE toParam #-}
 
   instance ToParam Data.Text.Lazy.Text where
-    toParam = cs
+    toParam = Data.Text.Lazy.toStrict
+    {-# INLINE toParam #-}
 
   instance ToParam Data.ByteString.ByteString where
-    toParam = cs
+    toParam = Data.Text.Encoding.decodeUtf8With
+                Data.Text.Encoding.Error.lenientDecode
+    {-# INLINE toParam #-}
 
   instance ToParam Data.ByteString.Lazy.ByteString where
-    toParam = cs
+    toParam = Data.Text.Encoding.decodeUtf8With
+                Data.Text.Encoding.Error.lenientDecode
+            . Data.ByteString.Lazy.toStrict
+    {-# INLINE toParam #-}
 
 
   -- |
@@ -245,6 +295,7 @@ where
   --
   instance Semigroup RequestError where
     (<>) = min
+    {-# INLINE (<>) #-}
 
   -- |
   -- Request errors can be thrown and catched, when accompanied with

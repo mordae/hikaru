@@ -34,10 +34,12 @@ where
     default csrfTokenValidity
       :: (MonadTrans t, MonadCsrf n, m ~ t n) => m Int64
     csrfTokenValidity = lift csrfTokenValidity
+    {-# INLINE csrfTokenValidity #-}
 
     default csrfTokenSecret
       :: (MonadTrans t, MonadCsrf n, m ~ t n) => m Text
     csrfTokenSecret = lift csrfTokenSecret
+    {-# INLINE csrfTokenSecret #-}
 
 
   -- |

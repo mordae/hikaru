@@ -85,6 +85,7 @@ where
   --
   lhref_ :: [Text] -> [(Text, Text)] -> Attribute
   lhref_ ps qs = href_ (makeLink ps qs)
+  {-# INLINE lhref_ #-}
 
 
   -- |
@@ -92,6 +93,7 @@ where
   --
   phref_ :: [Text] -> Attribute
   phref_ ps = href_ (makeLink ps [])
+  {-# INLINE phref_ #-}
 
 
   -- |
@@ -99,6 +101,7 @@ where
   --
   qhref_ :: [(Text, Text)] -> Attribute
   qhref_ qs = href_ (makeLink [] qs)
+  {-# INLINE qhref_ #-}
 
 
   -- Path Feedback -----------------------------------------------------------

@@ -91,6 +91,7 @@ where
     --
     localize :: (Monad m) => Locale -> a -> Maybe (HtmlT m ())
     localize _lc = const Nothing
+    {-# INLINE localize #-}
 
 
   -- |
@@ -99,6 +100,7 @@ where
   --
   instance Localized Text where
     localize _lc = Just . toHtml
+    {-# INLINE localize #-}
 
 
   -- |
