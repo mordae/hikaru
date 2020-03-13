@@ -113,7 +113,6 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
-  import Network.Wai.Internal (getRequestBodyChunk)
   import Network.Wai.Parse
   import Web.Cookie
   import Hikaru.Media
