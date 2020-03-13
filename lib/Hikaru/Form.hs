@@ -262,22 +262,6 @@ where
   -- |
   -- TODO
   --
-{-
-  csrfTokenField :: (MonadCsrf m) => l -> Form l m Text
-  csrfTokenField msg = Form do
-    token <- generateToken
-
-    unForm $ hiddenField "_token" (Just token) do
-      whenChecking do
-        value <- fromMaybe "" <$> fieldValue
-        valid <- isTokenValid value
-
-        if valid
-           then return ()
-           else addNote $ NoteError msg
--}
-
-
   csrfTokenField :: (MonadCsrf m) => l -> Form l m Text
   csrfTokenField msg = Form do
     Env{envCheck} <- ask
