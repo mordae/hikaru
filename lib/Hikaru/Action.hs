@@ -92,7 +92,6 @@ module Hikaru.Action
   , respond
 
   -- ** Re-Exports
-  , FileInfo
   , FilePath
   )
 where
@@ -227,7 +226,7 @@ where
   -- |
   -- Fields and files sent using a web form.
   --
-  type FormData = ([(Text, Text)], [(Text, FileInfo FilePath)])
+  type FormData = ([(Text, Text)], [(Text, FilePath)])
 
 
   -- |
@@ -652,21 +651,21 @@ where
   -- Identical to 'getFields', except it returns information about
   -- files uploaded through the form.
   --
-  getFiles :: (MonadAction m) => m [(Text, FileInfo FilePath)]
+  getFiles :: (MonadAction m) => m [(Text, FilePath)]
   getFiles = snd <$> getFormData
 
 
   -- |
   -- Obtain a specific form file
   --
-  getFileMaybe :: (MonadAction m) => Text -> m (Maybe (FileInfo FilePath))
+  getFileMaybe :: (MonadAction m) => Text -> m (Maybe FilePath)
   getFileMaybe n = lookup n <$> getFiles
 
 
   -- |
   -- Obtain a group of form files with the same name.
   --
-  getFileList :: (MonadAction m) => Text -> m [FileInfo FilePath]
+  getFileList :: (MonadAction m) => Text -> m [FilePath]
   getFileList n = map snd . filter ((n ==) . fst) <$> getFiles
 
 
@@ -706,8 +705,8 @@ where
             form' <- liftIO do
               sinkRequestBody (tempFileBackEnd rtis) bt getChunk
 
-            -- Convert ByteString to Text fields.
-            let form = csForm form'
+            -- Perform string conversions and simplify uploaded file types.
+            let form = adaptForm form'
 
             -- Cache and return.
             setActionField aeBody (BodyForm form)
@@ -720,10 +719,13 @@ where
 
 
   -- |
-  -- Convert form names and fields from 'ByteString' to 'Text'.
+  -- Convert form names and fields from 'ByteString' to 'Text' and
+  -- extract just the uploaded file names from the 'FileInfo' structures.
   --
-  csForm :: ([Param], [File FilePath]) -> FormData
-  csForm (ps, fs) = (map cs2 ps, map cs1 fs)
+  adaptForm :: ([Param], [(ByteString, FileInfo FilePath)]) -> FormData
+  adaptForm (ps, fs) = (map cs2 ps, map convFile fs)
+    where
+      convFile (n, FileInfo{fileContent}) = (cs n, fileContent)
 
 
   -- |
@@ -1048,18 +1050,9 @@ where
   -- |
   -- Helper to apply 'cs' to both elements of a 2-tuple.
   --
-  cs2 :: ( ConvertibleStrings a c
-         , ConvertibleStrings b d
-         )
+  cs2 :: (ConvertibleStrings a c, ConvertibleStrings b d)
       => (a, b) -> (c, d)
   cs2 (x, y) = (cs x, cs y)
-
-
-  -- |
-  -- Helper to apply 'cs' to the first element of a 2-tuple.
-  --
-  cs1 :: (ConvertibleStrings a c) => (a, b) -> (c, b)
-  cs1 (x, y) = (cs x, y)
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

@@ -184,7 +184,7 @@ where
     = Env
       { envPrefix      :: [Text]
       , envParams      :: [(Text, Text)]
-      , envFiles       :: [(Text, FileInfo FilePath)]
+      , envFiles       :: [(Text, FilePath)]
       , envCheck       :: Bool
       }
 
@@ -572,7 +572,7 @@ where
     return $ fromParam =<< lookup name envParams
 
 
-  formFileMaybe :: (Monad m) => Text -> FormT l m (Maybe (FileInfo FilePath))
+  formFileMaybe :: (Monad m) => Text -> FormT l m (Maybe FilePath)
   formFileMaybe name = do
     Env{envFiles} <- ask
     return $ lookup name envFiles
