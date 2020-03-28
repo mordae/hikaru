@@ -810,7 +810,7 @@ where
   -- |
   -- Replace a single 'Response' header with a new one that is constructed
   -- by applying the supplied function to the value of the previous one. Only
-  -- the last set header is modified, other matching headers are discarded.
+  -- the last header is modified, other matching headers are discarded.
   --
   -- Used in conjunction with 'maybe' this can be used to append header
   -- values in a sensible way.
