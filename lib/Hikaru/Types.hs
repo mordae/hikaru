@@ -114,10 +114,6 @@ where
                       _else -> Nothing
     {-# INLINE fromParam #-}
 
-  instance FromParam String where
-    fromParam = Just . unpack
-    {-# INLINE fromParam #-}
-
   instance FromParam Text where
     fromParam = Just . id
     {-# INLINE fromParam #-}
@@ -211,10 +207,6 @@ where
 
   instance ToParam Char where
     toParam char = pack [char]
-    {-# INLINE toParam #-}
-
-  instance ToParam String where
-    toParam = pack
     {-# INLINE toParam #-}
 
   instance ToParam Text where
