@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c3d7457dca96378df357bb52bd4eb8bf006764d262483124af6a580c32a228b7
+-- hash: 789872e5159353725050ec2764d9951be0fbf0c39bb684307f281650bb6fd9a8
 
 name:           hikaru
 version:        0.1.0.0
@@ -47,7 +47,7 @@ library
       Paths_hikaru
   hs-source-dirs:
       lib
-  default-extensions: BlockArguments DefaultSignatures FlexibleInstances GeneralizedNewtypeDeriving GADTs LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving
+  default-extensions: BlockArguments DataKinds DefaultSignatures FlexibleInstances GADTs GeneralizedNewtypeDeriving KindSignatures LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving UndecidableInstances
   ghc-options: -Wall -Wcompat
   build-depends:
       aeson >=1.4 && <1.5

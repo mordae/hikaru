@@ -234,7 +234,7 @@ where
   --
   -- Fails with 'NotFound' if the segment is missing or unparseable.
   --
-  arg :: (FromParam a) => Route a
+  arg :: (Param a) => Route a
   arg = argWith fromParam
 
 

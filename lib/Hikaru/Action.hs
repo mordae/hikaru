@@ -99,6 +99,7 @@ where
 
   import qualified Data.ByteString.Lazy as LBS
   import qualified Data.Text.Lazy as LT
+  import qualified Network.Wai.Parse as Parse
 
   import Control.Monad.Trans
   import Control.Monad.Trans.Resource
@@ -112,7 +113,6 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
-  import Network.Wai.Parse
   import Web.Cookie
   import Hikaru.Media
   import Hikaru.Types
@@ -364,14 +364,14 @@ where
   --
   getParams :: (MonadAction m) => m [(Text, Text)]
   getParams = map convert <$> queryString <$> getRequest
-    where convert (n, v) = (cs n, fromMaybe "" $ cs <$> v)
+    where convert (n, v) = (cs n, maybe "" cs v)
 
 
   -- |
   -- Obtain a specific request query string parameter and parse it
   -- on the fly to the target type. Parsing failure maps to 'Nothing'.
   --
-  getParamMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
+  getParamMaybe :: (MonadAction m, Param a) => Text -> m (Maybe a)
   getParamMaybe n = do
     value <- lookup n <$> getParams
     return $ fromParam =<< value
@@ -381,7 +381,7 @@ where
   -- Similar to 'getParamMaybe', but return either the parsed parameter
   -- or the specified default value.
   --
-  getParamDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getParamDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
 
 
@@ -389,7 +389,7 @@ where
   -- Obtain a group of request query string parameters with the same name
   -- and parse them on the fly to the target type.
   --
-  getParamList :: (MonadAction m, FromParam a) => Text -> m [a]
+  getParamList :: (MonadAction m, Param a) => Text -> m [a]
   getParamList n = mapMaybe (fromParam . snd)
                    <$> filter ((n ==) . fst)
                    <$> getParams
@@ -411,7 +411,7 @@ where
   -- Obtain a specific cookie and parse it on the fly to the target type.
   -- Parsing failure maps to 'Nothing'.
   --
-  getCookieMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
+  getCookieMaybe :: (MonadAction m, Param a) => Text -> m (Maybe a)
   getCookieMaybe n = do
     value <- lookup n <$> getCookies
     return $ fromParam =<< value
@@ -421,7 +421,7 @@ where
   -- Similar to 'getCookieMaybe', but return either the parsed cookie
   -- or the specified default value.
   --
-  getCookieDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getCookieDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
 
 
@@ -623,7 +623,7 @@ where
   -- Obtain a specific form field and parse it on the fly to the target type.
   -- Parsing failure maps to 'Nothing'.
   --
-  getFieldMaybe :: (MonadAction m, FromParam a) => Text -> m (Maybe a)
+  getFieldMaybe :: (MonadAction m, Param a) => Text -> m (Maybe a)
   getFieldMaybe n = do
     value <- lookup n <$> getFields
     return $ fromParam =<< value
@@ -633,7 +633,7 @@ where
   -- Similar to 'getFieldMaybe', but return either the parsed field
   -- or the specified default value.
   --
-  getFieldDefault :: (MonadAction m, FromParam a) => Text -> a -> m a
+  getFieldDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
 
 
@@ -641,7 +641,7 @@ where
   -- Obtain a group of form fields with the same name and parse them on the
   -- fly to the target type.
   --
-  getFieldList :: (MonadAction m, FromParam a) => Text -> m [a]
+  getFieldList :: (MonadAction m, Param a) => Text -> m [a]
   getFieldList n = mapMaybe (fromParam . snd)
                    <$> filter ((n ==) . fst)
                    <$> getFields
@@ -691,7 +691,7 @@ where
 
       -- Body has not been parsed yet. This is very good.
       BodyUnparsed -> do
-        bodyType <- getRequestBodyType <$> getRequest
+        bodyType <- Parse.getRequestBodyType <$> getRequest
         getChunk <- getBodyChunkIO
 
         case bodyType of
@@ -703,7 +703,7 @@ where
 
             -- Parse the form data.
             form' <- liftIO do
-              sinkRequestBody (tempFileBackEnd rtis) bt getChunk
+              Parse.sinkRequestBody (Parse.tempFileBackEnd rtis) bt getChunk
 
             -- Perform string conversions and simplify uploaded file types.
             let form = adaptForm form'
@@ -720,12 +720,12 @@ where
 
   -- |
   -- Convert form names and fields from 'ByteString' to 'Text' and
-  -- extract just the uploaded file names from the 'FileInfo' structures.
+  -- extract just the uploaded file names from the 'Parse.FileInfo' structures.
   --
-  adaptForm :: ([Param], [(ByteString, FileInfo FilePath)]) -> FormData
+  adaptForm :: ([Parse.Param], [(ByteString, Parse.FileInfo FilePath)]) -> FormData
   adaptForm (ps, fs) = (map cs2 ps, map convFile fs)
     where
-      convFile (n, FileInfo{fileContent}) = (cs n, fileContent)
+      convFile (n, Parse.FileInfo{fileContent}) = (cs n, fileContent)
 
 
   -- |

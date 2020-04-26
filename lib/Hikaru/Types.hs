@@ -11,9 +11,9 @@ This module provides types common for multiple other modules.
 -}
 
 module Hikaru.Types
-  ( FromParam(..)
-  , ToParam(..)
+  ( Param(..)
   , RequestError(..)
+  , Severity(..)
   , defaultHandler
   )
 where
@@ -37,192 +37,176 @@ where
   -- parameter into some kind of value. One does not usually pass around
   -- more complex arguments than these, so forgive the limited menu.
   --
-  class FromParam a where
+  class Param a where
     fromParam :: Text -> Maybe a
+    toParam   :: a -> Text
 
-  instance FromParam Int where
+  instance (Param a) => Param (Maybe a) where
+    fromParam = Just . fromParam
+    {-# INLINE fromParam #-}
+
+    toParam = maybe "" toParam
+    {-# INLINE toParam #-}
+
+  instance Param Int where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Int8 where
-    fromParam = readMaybe . unpack
+    toParam = pack . show
+    {-# INLINE toParam #-}
 
-    {-# INLINE fromParam #-}
-  instance FromParam Int16 where
-    fromParam = readMaybe . unpack
-    {-# INLINE fromParam #-}
-
-  instance FromParam Int32 where
+  instance Param Int8 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Int64 where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Int16 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Word where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Int32 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Word8 where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Int64 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Word16 where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Word where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Word32 where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Word8 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Word64 where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Word16 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Integer where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Word32 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Natural where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Word64 where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Float where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Integer where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam Double where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Natural where
     fromParam = readMaybe . unpack
     {-# INLINE fromParam #-}
 
-  instance FromParam () where
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Float where
+    fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
+
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param Double where
+    fromParam = readMaybe . unpack
+    {-# INLINE fromParam #-}
+
+    toParam = pack . show
+    {-# INLINE toParam #-}
+
+  instance Param () where
     fromParam _ = Just ()
     {-# INLINE fromParam #-}
 
-  instance FromParam Bool where
+    toParam _ = ""
+    {-# INLINE toParam #-}
+
+  instance Param Bool where
     fromParam "true"  = Just True
     fromParam "True"  = Just True
+    fromParam "on"    = Just True
+    fromParam "On"    = Just True
+    fromParam "1"     = Just True
     fromParam "false" = Just False
     fromParam "False" = Just False
+    fromParam "off"   = Just False
+    fromParam "Off"   = Just False
+    fromParam "0"     = Just False
     fromParam _else   = Nothing
     {-# INLINE fromParam #-}
 
-  instance FromParam Char where
+    toParam True  = "true"
+    toParam False = "false"
+    {-# INLINE toParam #-}
+
+  instance Param Char where
     fromParam inp = case (unpack inp) of
                       [x]   -> Just x
                       _else -> Nothing
     {-# INLINE fromParam #-}
 
-  instance FromParam Text where
-    fromParam = Just . id
-    {-# INLINE fromParam #-}
-
-  instance FromParam Data.Text.Lazy.Text where
-    fromParam = Just . Data.Text.Lazy.fromStrict
-    {-# INLINE fromParam #-}
-
-  instance FromParam Data.ByteString.ByteString where
-    fromParam = Just . Data.Text.Encoding.encodeUtf8
-    {-# INLINE fromParam #-}
-
-  instance FromParam Data.ByteString.Lazy.ByteString where
-    fromParam = Just . Data.ByteString.Lazy.fromStrict
-                     . Data.Text.Encoding.encodeUtf8
-    {-# INLINE fromParam #-}
-
-
-  -- |
-  -- Values that can be represented as a piece of 'Text' to be used in a
-  -- route segment or a query string. One does not usually pass around
-  -- more complex arguments than these, so forgive the limited menu.
-  --
-  class ToParam a where
-    toParam :: a -> Text
-
-  instance ToParam Int where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Int8 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Int16 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Int32 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Int64 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Word where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Word8 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Word16 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Word32 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Word64 where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Integer where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Natural where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Float where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam Double where
-    toParam = pack . show
-    {-# INLINE toParam #-}
-
-  instance ToParam () where
-    toParam _ = ""
-    {-# INLINE toParam #-}
-
-  instance ToParam Bool where
-    toParam True  = "true"
-    toParam False = "false"
-    {-# INLINE toParam #-}
-
-  instance ToParam Char where
     toParam char = pack [char]
     {-# INLINE toParam #-}
 
-  instance ToParam Text where
+  instance Param Text where
+    fromParam = Just . id
+    {-# INLINE fromParam #-}
+
     toParam = id
     {-# INLINE toParam #-}
 
-  instance ToParam Data.Text.Lazy.Text where
+  instance Param Data.Text.Lazy.Text where
+    fromParam = Just . Data.Text.Lazy.fromStrict
+    {-# INLINE fromParam #-}
+
     toParam = Data.Text.Lazy.toStrict
     {-# INLINE toParam #-}
 
-  instance ToParam Data.ByteString.ByteString where
+  instance Param Data.ByteString.ByteString where
+    fromParam = Just . Data.Text.Encoding.encodeUtf8
+    {-# INLINE fromParam #-}
+
     toParam = Data.Text.Encoding.decodeUtf8With
                 Data.Text.Encoding.Error.lenientDecode
     {-# INLINE toParam #-}
 
-  instance ToParam Data.ByteString.Lazy.ByteString where
+  instance Param Data.ByteString.Lazy.ByteString where
+    fromParam = Just . Data.ByteString.Lazy.fromStrict
+                     . Data.Text.Encoding.encodeUtf8
+    {-# INLINE fromParam #-}
+
     toParam = Data.Text.Encoding.decodeUtf8With
                 Data.Text.Encoding.Error.lenientDecode
             . Data.ByteString.Lazy.toStrict
@@ -325,6 +309,28 @@ where
     where
       response st = resp . responseLBS st [(hContentType, "text/plain")]
                          . cs . (<> "\n" <> msg)
+
+
+  -- |
+  -- Information severity to be used for messages.
+  --
+  data Severity
+    = Success
+    | Warning
+    | Danger
+    deriving (Eq, Ord, Enum, Show)
+
+  -- |
+  -- Concatenation yields the higher severity.
+  --
+  instance Semigroup Severity where
+    (<>) = max
+
+  -- |
+  -- 'Success' is the neutral element.
+  --
+  instance Monoid Severity where
+    mempty = Success
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

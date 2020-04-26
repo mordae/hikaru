@@ -24,10 +24,12 @@ extra-source-files: README.md
 ghc-options: -Wall -Wcompat
 default-extensions:
   - BlockArguments
+  - DataKinds
   - DefaultSignatures
   - FlexibleInstances
-  - GeneralizedNewtypeDeriving
   - GADTs
+  - GeneralizedNewtypeDeriving
+  - KindSignatures
   - LambdaCase
   - MultiParamTypeClasses
   - NamedFieldPuns
@@ -37,6 +39,7 @@ default-extensions:
   - RecordWildCards
   - ScopedTypeVariables
   - StandaloneDeriving
+  - UndecidableInstances
 
 dependencies:
   - aeson              >= 1.4  && <1.5

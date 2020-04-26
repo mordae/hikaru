@@ -170,7 +170,7 @@ where
     {-# INLINE fmap #-}
 
   instance (Monad m) => Applicative (Form l m) where
-    pure x = Form $ return $ Just x
+    pure x = Form $ pure $ Just x
     {-# INLINE pure #-}
 
     Form{unForm = unFormL} <*> Form{unForm = unFormR} = Form do
@@ -286,7 +286,7 @@ where
   -- |
   -- TODO
   --
-  hiddenField' :: (Monad m, ToParam a, FromParam a)
+  hiddenField' :: (Monad m, Param a)
                => Text -> FieldT l a m b -> Form l m a
   hiddenField' name field = hiddenField name Nothing field
 
@@ -294,7 +294,7 @@ where
   -- |
   -- TODO
   --
-  hiddenField :: (Monad m, ToParam a, FromParam a)
+  hiddenField :: (Monad m, Param a)
               => Text -> Maybe a -> FieldT l a m b -> Form l m a
   hiddenField name orig field = Form do
     name' <- makeName name
@@ -316,7 +316,7 @@ where
   -- |
   -- TODO
   --
-  inputField' :: (Monad m, ToParam a, FromParam a)
+  inputField' :: (Monad m, Param a)
               => Text -> l -> FieldT l a m b -> Form l m a
   inputField' name label field = inputField name label Nothing field
 
@@ -324,7 +324,7 @@ where
   -- |
   -- TODO
   --
-  inputField :: (Monad m, ToParam a, FromParam a)
+  inputField :: (Monad m, Param a)
              => Text -> l -> Maybe a -> FieldT l a m b -> Form l m a
   inputField name label orig field = Form do
     name' <- makeName name
@@ -347,7 +347,7 @@ where
   -- |
   -- TODO
   --
-  textArea' :: (Monad m, ToParam a, FromParam a)
+  textArea' :: (Monad m, Param a)
             => Text -> l -> FieldT l a m b -> Form l m a
   textArea' name label field = textArea name label Nothing field
 
@@ -355,7 +355,7 @@ where
   -- |
   -- TODO
   --
-  textArea :: (Monad m, ToParam a, FromParam a)
+  textArea :: (Monad m, Param a)
             => Text -> l -> Maybe a -> FieldT l a m b -> Form l m a
   textArea name label orig field = Form do
     name' <- makeName name
@@ -378,7 +378,7 @@ where
   -- |
   -- TODO
   --
-  selectField' :: (Monad m, ToParam a, FromParam a, Eq a)
+  selectField' :: (Monad m, Param a, Eq a)
                => Text -> l -> (a -> l) -> [a]
                -> FieldT l a m b -> Form l m a
   selectField' name label optlabel options field
@@ -388,7 +388,7 @@ where
   -- |
   -- TODO
   --
-  selectField :: (Monad m, ToParam a, FromParam a, Eq a)
+  selectField :: (Monad m, Param a, Eq a)
               => Text -> l -> (a -> l) -> [a] -> Maybe a
               -> FieldT l a m b -> Form l m a
   selectField name label optlabel options orig field = Form do
@@ -414,7 +414,7 @@ where
   -- |
   -- TODO
   --
-  selectFieldEnum' :: (Monad m, ToParam a, FromParam a, Eq a, Bounded a, Enum a)
+  selectFieldEnum' :: (Monad m, Param a, Eq a, Bounded a, Enum a)
                    => Text -> l -> (a -> l) -> FieldT l a m b -> Form l m a
   selectFieldEnum' name label optlabel field
     = selectFieldEnum name label optlabel Nothing field
@@ -425,7 +425,7 @@ where
   --
   -- TODO: Example
   --
-  selectFieldEnum :: (Monad m, ToParam a, FromParam a, Eq a, Bounded a, Enum a)
+  selectFieldEnum :: (Monad m, Param a, Eq a, Bounded a, Enum a)
                   => Text -> l -> (a -> l) -> Maybe a
                   -> FieldT l a m b -> Form l m a
   selectFieldEnum name label optlabel orig field
@@ -435,7 +435,7 @@ where
   -- |
   -- TODO
   --
-  multiSelectField' :: (Monad m, ToParam a, FromParam a, Eq a)
+  multiSelectField' :: (Monad m, Param a, Eq a)
                     => Text -> l -> (a -> l) -> [a]
                     -> FieldT l [a] m b -> Form l m [a]
   multiSelectField' name label optlabel options field
@@ -445,7 +445,7 @@ where
   -- |
   -- TODO
   --
-  multiSelectField :: (Monad m, ToParam a, FromParam a, Eq a)
+  multiSelectField :: (Monad m, Param a, Eq a)
                    => Text -> l -> (a -> l) -> [a] -> Maybe [a]
                    -> FieldT l [a] m b -> Form l m [a]
   multiSelectField name label optlabel options orig field = Form do
@@ -566,7 +566,7 @@ where
   isErrorNote _else                  = False
 
 
-  formParamMaybe :: (Monad m, FromParam a) => Text -> FormT l m (Maybe a)
+  formParamMaybe :: (Monad m, Param a) => Text -> FormT l m (Maybe a)
   formParamMaybe name = do
     Env{envParams} <- ask
     return $ fromParam =<< lookup name envParams
@@ -578,7 +578,7 @@ where
     return $ lookup name envFiles
 
 
-  formParams :: (Monad m, FromParam a) => Text -> FormT l m [a]
+  formParams :: (Monad m, Param a) => Text -> FormT l m [a]
   formParams name = do
     Env{envParams} <- ask
     let match = (name ==) . fst
