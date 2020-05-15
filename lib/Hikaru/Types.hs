@@ -22,8 +22,8 @@ where
   import Data.ByteString (ByteString)
   import Data.String.Conversions
   import Data.Text (Text, pack, unpack)
-  import Network.HTTP.Types.Status
   import Network.HTTP.Types.Header
+  import Network.HTTP.Types.Status
   import Network.Wai
 
   import qualified Data.ByteString.Lazy
@@ -181,21 +181,24 @@ where
     {-# INLINE toParam #-}
 
   instance Param Text where
-    fromParam = Just . id
+    fromParam "" = Nothing
+    fromParam sp = Just sp
     {-# INLINE fromParam #-}
 
     toParam = id
     {-# INLINE toParam #-}
 
   instance Param Data.Text.Lazy.Text where
-    fromParam = Just . Data.Text.Lazy.fromStrict
+    fromParam "" = Nothing
+    fromParam sp = Just $ Data.Text.Lazy.fromStrict sp
     {-# INLINE fromParam #-}
 
     toParam = Data.Text.Lazy.toStrict
     {-# INLINE toParam #-}
 
   instance Param Data.ByteString.ByteString where
-    fromParam = Just . Data.Text.Encoding.encodeUtf8
+    fromParam "" = Nothing
+    fromParam sp = Just $ Data.Text.Encoding.encodeUtf8 sp
     {-# INLINE fromParam #-}
 
     toParam = Data.Text.Encoding.decodeUtf8With
@@ -203,8 +206,9 @@ where
     {-# INLINE toParam #-}
 
   instance Param Data.ByteString.Lazy.ByteString where
-    fromParam = Just . Data.ByteString.Lazy.fromStrict
-                     . Data.Text.Encoding.encodeUtf8
+    fromParam "" = Nothing
+    fromParam sp = Just $ Data.ByteString.Lazy.fromStrict
+                        $ Data.Text.Encoding.encodeUtf8 sp
     {-# INLINE fromParam #-}
 
     toParam = Data.Text.Encoding.decodeUtf8With

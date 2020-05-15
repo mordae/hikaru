@@ -16,33 +16,32 @@ First, you need to create a message catalog:
 data SampleMessages
   = MsgSuccess
   | MsgFailure
+  deriving (Show)
 
 -- Default HTML rendering of the messages.
 instance 'ToHtml' SampleMessages where
   'toHtmlRaw' = 'toHtml'
-  'toHtml' MsgSuccess = \"Success\"
-  'toHtml' MsgFailure = \"Failure\"
 
 -- Language-specific rendering of those messages.
-instance Localized SampleMessages where
-  -- Czech variants
-  localize \"cs\" MsgSuccess = 'Just' \"Úspěch\"
-  localize \"cs\" MsgFailure = 'Just' \"Selhání\"
+instance Localizable SampleMessages where
+  -- English variants
+  'localize' \"en\" MsgSuccess = 'Just' \"Success\"
+  'localize' \"en\" MsgFailure = 'Just' \"Failure\"
 
-  -- English is the default
-  localize \"en\" msg        = 'Just' ('toHtml' msg)
+  -- Czech variants
+  'localize' \"cs\" MsgSuccess = 'Just' \"Úspěch\"
+  'localize' \"cs\" MsgFailure = 'Just' \"Selhání\"
 
   -- Otherwise try the next locale
-  localize _locale _msg    = 'Nothing'
+  'localize' _locale _msg = 'Nothing'
 @
 
 Next, create a preferred language list for every action:
 
 @
 'Hikaru.Dispatch.dispatch' runAction $ do
-  'Hikaru.Dispatch.wrapActions' ('selectLanguages' \"lang\" \"lang\" >>)
-
-  'Hikaru.Dispatch.route' ...
+  'Hikaru.Dispatch.wrapAction' ('selectLanguages' \"lang\" \"lang\" >>) $ do
+    'Hikaru.Dispatch.route' ...
 @
 
 Finally, you can use your catalog when rendering pages:
@@ -59,7 +58,8 @@ getSampleR flag = do
 
 module Hikaru.Localize
   ( Locale
-  , Localized(..)
+  , Localizable(..)
+  , lc
   , lc_
   , selectLanguages
   )
@@ -84,35 +84,65 @@ where
   -- |
   -- Any message that can be rendered localized.
   --
-  class (ToHtml a) => Localized a where
+  class (Show l) => Localizable l where
     -- |
     -- Try to localize the message using given locale.
     -- Return 'Nothing' if the locale is not supported.
     --
-    localize :: (Monad m) => Locale -> a -> Maybe (HtmlT m ())
-    localize _lc = const Nothing
+    localize :: Locale -> l -> Maybe Text
+    localize _lang _msg = Nothing
     {-# INLINE localize #-}
+
+    -- |
+    -- Same as 'localize', but for HTML.
+    -- Defaults to using the plain 'localize'.
+    --
+    localizeHtml :: (Monad m) => Locale -> l -> Maybe (HtmlT m ())
+    localizeHtml lang = fmap toHtml . localize lang
+    {-# INLINE localizeHtml #-}
 
 
   -- |
   -- Instance to make 'Text' usable for interoperability and
   -- gradual localization.
   --
-  instance Localized Text where
-    localize _lc = Just . toHtml
+  instance Localizable Text where
+    localize _lc = Just
     {-# INLINE localize #-}
+
+
+  -- |
+  -- Instance to make 'Maybe' values simpler to render localized.
+  --
+  instance Localizable l => Localizable (Maybe l) where
+    localize lang (Just msg) = localize lang msg
+    localize _ Nothing       = Just ""
+    {-# INLINE localize #-}
+
+
+  -- |
+  -- Localize given message to the language indicated by the
+  -- 'getLanguages' of the current action. Uses 'localize' internally.
+  --
+  lc :: (MonadAction m, Localizable l) => l -> m Text
+  lc msg = do
+    langs <- getLanguages
+
+    case mapMaybe (flip localize msg) langs of
+      []  -> return $ cs $ show msg
+      x:_ -> return x
 
 
   -- |
   -- Localize given message to the language indicated by the
   -- 'getLanguages' of the current action.
   --
-  lc_ :: (MonadAction m, Localized a) => a -> HtmlT m ()
+  lc_ :: (MonadAction m, Localizable l) => l -> HtmlT m ()
   lc_ msg = do
     langs <- getLanguages
 
-    case mapMaybe (flip localize msg) langs of
-      []  -> toHtml msg
+    case mapMaybe (flip localizeHtml msg) langs of
+      []  -> toHtml $ show msg
       x:_ -> x
 
 

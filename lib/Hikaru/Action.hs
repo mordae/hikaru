@@ -855,7 +855,7 @@ where
 
   -- |
   -- Default @Content-Type@ to @text/html; charset=utf8@
-  -- and set the response body to the provided byte string.
+  -- and set the response body to the rendering of provided HTML markup.
   --
   sendHTML :: (MonadAction m) => HtmlT m a -> m ()
   sendHTML html = do

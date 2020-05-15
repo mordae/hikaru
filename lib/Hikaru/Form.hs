@@ -7,589 +7,777 @@ Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
 Portability :  non-portable (ghc)
 
-This module provides applicative form handling.
+This module provides tools for building localized HTML forms
+with server-side validation.
+
+There are three important steps involved:
+
+1. A 'Form' needs to be defined first. For that you need to supply the
+   underlying data type as well as high-level description of the form
+   elements.
+
+2. It needs be fed some request data. You control what data by using
+   'newForm', 'getForm' or 'postForm'.
+
+3. It needs to be rendered as HTML. This module will leave you with a
+   high-level form 'View', but you need to take care of the rendering
+   yourself.
+
 -}
 
 module Hikaru.Form
-  ( MonadCsrf(..)
-  , View(..)
-  , FormNote(..)
-  , NoteLevel(..)
-  , Form
-  , FieldT
-  , newForm
+  (
+  -- * Using Forms
+  -- |
+  -- Running a form generally means turning the request data into an updated
+  -- form view and when validation succeeds also the resulting object.
+  --
+    newForm
   , getForm
   , postForm
-  , hiddenField
-  , hiddenField'
-  , csrfTokenField
-  , inputField
-  , inputField'
-  , textArea
-  , textArea'
-  , selectField
-  , selectField'
-  , selectFieldEnum
-  , selectFieldEnum'
-  , multiSelectField
-  , multiSelectField'
-  , opt
-  , req
-  , processValue
-  , whenChecking
-  , fieldShouldCheck
-  , fieldValue
-  , addNote
-  , addAttribute
-  , hasErrors
+  , runForm
+
+  -- * Building Forms
+  -- |
+  -- Forms are constructed using a simple DSL described lower.
+  --
+  , Form
+  , FormT
+
+  -- ** Elements
+  , element
+  , hidden
+
+  -- ** Controls
+  , ElementT
+  , ControlT
+
+  -- *** Input
+  , input
+  , input'
+  , placeholder
+
+  -- *** Select
+  , select
+  , options
+  , optionsFromValues
+  , optionsFromEnum
+
+  -- ** Validation
+  , validate
+  , check
+  , note
+
+  -- ** Rendering Hints
+  , hint
+
+  -- ** Debugging
+  , dumpForm
+  , dumpControl
+
+  -- * Rendering Forms
+  , View(..)
+  , Element(..)
+  , Control(..)
+  , Note(..)
+  , Field(..)
+  , FieldTag(..)
+  , Option(..)
+  , ToOption(..)
+  , Selectable(..)
+
+  -- ** Localization
+  , FormMessage(..)
+  , FromFormMessage(..)
   )
 where
-  import BasePrelude
+  import BasePrelude hiding (Option, Control)
 
-  import Control.Monad.Reader
-  import Control.Monad.State
+  import Control.Monad.Reader (ReaderT, runReaderT, ask)
+  import Control.Monad.State (StateT, runStateT, execStateT, modify, get)
+  import Control.Monad.Trans (MonadTrans, lift)
   import Data.Text (Text, strip)
   import Hikaru.Action
-  import Hikaru.CSRF
+  import Hikaru.Localize
   import Hikaru.Types
 
 
-  -- Form Types --------------------------------------------------------------
+  data Env o
+    = Env
+      { envPrefix      :: Text
+      , envParams      :: Maybe [(Text, Text)]
+      , envFiles       :: Maybe [(Text, FilePath)]
+      , envValue       :: Maybe o
+      , envValidate    :: Bool
+      }
+    deriving (Show)
 
 
+  -- |
+  -- Root of the generated form.
+  --
+  -- Can be used to render the form as HTML.
+  -- Roughly corresponds to the @\<form\>@ element.
+  --
   data View l
-    = FormFields
-      { viewFields     :: [View l]
-      , viewNotes      :: [FormNote l]
+    = View
+      { viewElements   :: [Element l]
+      , viewControls   :: [Control l]
       }
-    | HiddenField
-      { viewName       :: Text
-      , viewValue      :: Maybe Text
-      , viewNotes      :: [FormNote l]
-      , viewAttrs      :: [(Text, Dynamic)]
-      }
-    | InputField
-      { viewName       :: Text
-      , viewLabel      :: l
-      , viewValue      :: Maybe Text
-      , viewNotes      :: [FormNote l]
-      , viewAttrs      :: [(Text, Dynamic)]
-      }
-    | TextArea
-      { viewName       :: Text
-      , viewLabel      :: l
-      , viewValue      :: Maybe Text
-      , viewNotes      :: [FormNote l]
-      , viewAttrs      :: [(Text, Dynamic)]
-      }
-    | SelectField
-      { viewName       :: Text
-      , viewLabel      :: l
-      , viewOptions    :: [(Text, l, Bool)]
-      , viewNotes      :: [FormNote l]
-      , viewAttrs      :: [(Text, Dynamic)]
-      , viewMulti      :: Bool
-      }
-
-  instance Semigroup (View l) where
-    FormFields [] [] <> view = view
-    view <> FormFields [] [] = view
-
-    FormFields fs1 ns1 <> FormFields fs2 ns2
-      = FormFields (fs1 <> fs2) (ns1 <> ns2)
-
-    FormFields fs ns <> view
-      = FormFields (fs <> [view]) ns
-
-    view <> FormFields fs ns
-      = FormFields ([view] <> fs) ns
-
-    v1 <> v2 = FormFields ([v1, v2]) []
-
-    {-# INLINE (<>) #-}
-
-  instance Monoid (View l) where
-    mempty = FormFields [] []
-    {-# INLINE mempty #-}
+    deriving (Show)
 
 
   -- |
-  -- TODO
+  -- Shortcut for a form that produces a value with the same type as was
+  -- the original object. This should be a rule for all the forms.
   --
-  data FormNote l
-    = FormNote
-      { noteLevel      :: NoteLevel
-      , noteLabel      :: l
-      }
-    deriving (Eq, Ord)
-
+  -- Example:
+  --
+  -- @
+  -- addItemForm :: ('MonadAction' m) => 'Form' Messages m AddItem
+  -- addItemForm = do
+  --   AddItem
+  --     \<$\> 'element' MsgItemName do
+  --           'input'' "name" itemName
+  --
+  --     \<*\> 'element' MsgItemType do
+  --           'select' "type" itemType do
+  --             'optionsFromEnum' MsgItemType
+  -- @
+  --
+  type Form l m o = FormT l o m o
 
   -- |
-  -- TODO
+  -- Applicative functor for form construction.
   --
-  data NoteLevel
-    = NoteError
-    | NoteNeutral
-    | NoteSuccess
-    deriving (Eq, Ord, Show)
-
-  instance Semigroup NoteLevel where
-    (<>) = min
-    {-# INLINE (<>) #-}
-
-  instance Monoid NoteLevel where
-    mempty = NoteSuccess
-    {-# INLINE mempty #-}
-
-
-  newtype FormT l m a
+  newtype FormT l o m a
     = FormT
-      { unFormT        :: ReaderT (Env l) (StateT (View l) m) a
-      }
-    deriving (MonadIO, Monad, Applicative, Functor)
-
-  deriving instance (Monad m) => MonadReader (Env l) (FormT l m)
-  deriving instance (Monad m) => MonadState (View l) (FormT l m)
-
-  instance MonadTrans (FormT l) where
-    lift = FormT . lift . lift
-    {-# INLINE lift #-}
-
-  instance (MonadCsrf m) => MonadCsrf (FormT l m)
-
-
-  newtype Form l m a
-    = Form
-      { unForm         :: FormT l m (Maybe a)
+      { runFormT       :: ReaderT (Env o) (StateT (View l) m) (Maybe a)
       }
 
-  instance (Monad m) => Functor (Form l m) where
-    fmap f Form{..} = Form do
-      x <- unForm
+  instance (Monad m) => Functor (FormT l o m) where
+    fmap f FormT{..} = FormT do
+      x <- runFormT
       return $ fmap f x
     {-# INLINE fmap #-}
 
-  instance (Monad m) => Applicative (Form l m) where
-    pure x = Form $ pure $ Just x
+  instance (Monad m) => Applicative (FormT l o m) where
+    pure x = FormT $ pure $ Just x
     {-# INLINE pure #-}
 
-    Form{unForm = unFormL} <*> Form{unForm = unFormR} = Form do
-      l <- unFormL
-      r <- unFormR
-      return $ l <*> r
+    l <*> r = FormT do
+      l' <- runFormT l
+      r' <- runFormT r
+      return $ l' <*> r'
     {-# INLINE (<*>) #-}
 
 
-  data Env l
-    = Env
-      { envPrefix      :: [Text]
-      , envParams      :: [(Text, Text)]
-      , envFiles       :: [(Text, FilePath)]
-      , envCheck       :: Bool
+  -- |
+  -- A form element that normally corresponds to a single row.
+  --
+  -- An element can be either visible or hidden and can have multiple
+  -- controls. Hidden elements can have only 'input' controls.
+  --
+  data Element l
+    = Element
+      { elemLabel      :: l
+      , elemControls   :: [Control l]
+      }
+    deriving (Show)
+
+
+  -- |
+  -- Element customization context.
+  --
+  newtype ElementT l o m a
+    = ElementT
+      { runElementT    :: ReaderT (Env o) (StateT (Element l) m) (Maybe a)
       }
 
+  instance (Monad m) => Functor (ElementT l o m) where
+    fmap f ElementT{..} = ElementT do
+      x <- runElementT
+      return $ fmap f x
+    {-# INLINE fmap #-}
 
-  newtype FieldT l a m b
-    = FieldT
-      { unFieldT       :: ReaderT Bool (StateT (View l, Maybe a) m) b
+  instance (Monad m) => Applicative (ElementT l o m) where
+    pure x = ElementT $ pure $ Just x
+    {-# INLINE pure #-}
+
+    l <*> r = ElementT do
+      l' <- runElementT l
+      r' <- runElementT r
+      return $ l' <*> r'
+    {-# INLINE (<*>) #-}
+
+
+  -- |
+  -- Form controls extend fields with a name, notes and rendering hints.
+  --
+  data Control l
+    = Control
+      { ctrlName       :: Text
+      , ctrlField      :: Field l
+      , ctrlNotes      :: [Note l]
+      , ctrlHints      :: [Dynamic]
+      }
+    deriving (Show)
+
+
+  data ControlState l v m
+    = ControlState
+      { csName         :: Text
+      , csField        :: Field l
+      , csHints        :: [Dynamic]
+      , csValidators   :: [Maybe v -> m [Note l]]
+      , csValue        :: Maybe v
+      }
+
+  instance (Show l, Show v) => Show (ControlState l v m) where
+    show ControlState{..} =
+      mconcat [ "ControlState {"
+              , "csName = " <> show csName
+              , ", csField = " <> show csField
+              , ", csHints = " <> show csHints
+              , ", csValidators = " <> show (length csValidators)
+              , ", csValue = " <> show csValue
+              , "}"
+              ]
+
+
+  -- |
+  -- Control customization context.
+  --
+  -- Note that you can access the underlying 'Monad' using 'lift' here.
+  --
+  newtype ControlT (t :: FieldTag) l o v m a
+    = ControlT
+      { runControlT    :: ReaderT (Env o) (StateT (ControlState l v m) m) a
       }
     deriving (MonadIO, Monad, Applicative, Functor)
 
-  instance MonadTrans (FieldT l a) where
-    lift = FieldT . lift . lift
+  instance MonadTrans (ControlT t l o v) where
+    lift = ControlT . lift . lift
     {-# INLINE lift #-}
 
-  instance (MonadCsrf m) => MonadCsrf (FieldT l a m)
+  instance (MonadAction m) => MonadAction (ControlT t l o v m) where
+    getActionEnv = ControlT $ lift $ lift $ getActionEnv
+    {-# INLINE getActionEnv #-}
+
+
+  -- |
+  -- Short text with associated severity to be presented along the
+  -- form control. Used to indicate validation results.
+  --
+  data Note l
+    = Note
+      { noteSeverity   :: Severity
+      , noteMessage    :: l
+      }
+    deriving (Show)
+
+
+  -- |
+  -- Form field types.
+  --
+  -- If you miss checkbox, radio or textarea, remember that you can
+  -- signal the way to render the field using a rendering 'hint'.
+  --
+  data Field l
+    = InputField
+      { fieldType      :: Text
+      , fieldPlacehold :: Maybe l
+      , fieldValue     :: Text
+      }
+    | SelectField
+      { fieldOptions   :: [Option l]
+      }
+    deriving (Show)
+
+
+  -- |
+  -- Tag used to specialize context for the individual control types.
+  --
+  data FieldTag
+    = InputFieldTag
+    | SelectFieldTag
+    deriving (Show, Eq)
+
+
+  -- |
+  -- An option for 'select' to choose from.
+  --
+  data Option l
+    = Option
+      { optionLabel    :: l
+      , optionSelected :: Bool
+      , optionValue    :: Text
+      }
+    deriving (Show)
+
+
+  class ToOption l o where
+    toOption :: o -> Option l
+
+  instance ToOption l (Option l) where
+    toOption = id
+    {-# INLINE toOption #-}
+
+
+  -- |
+  -- A class with two overlapping instances used to smoothly handle
+  -- both single-select and multi-select controls.
+  --
+  class Selectable a where
+    selectValues  :: [Text] -> Maybe a
+    selectOptions :: a -> [Option l] -> [Option l]
+
+  instance {-# OVERLAPPING #-} (Param a, Eq a) => Selectable a where
+    selectValues [p] = fromParam p
+    selectValues _ps = Nothing
+
+    selectOptions p = map update
+      where
+        update opt@Option{..} = opt { optionSelected = match optionValue }
+        match x = case fromParam x of
+                    Nothing -> False
+                    Just x' -> p == x'
+
+  instance {-# OVERLAPPING #-} (Param a, Eq a) => Selectable [a] where
+    selectValues = Just . mapMaybe fromParam
+
+    selectOptions ps = map update
+      where
+        update opt@Option{..} = opt { optionSelected = match optionValue }
+        match x = case fromParam x of
+                    Nothing -> False
+                    Just x' -> x' `elem` ps
+
+
+  -- |
+  -- Default localized messages related to form validation.
+  --
+  -- You might want to wrap this in your message catalog:
+  --
+  -- @
+  -- data Messages
+  --   = MsgForm 'FormMessage'
+  --   | ...
+  --   deriving (Show)
+  --
+  -- instance 'Localizable' Messages where
+  --   'localize' lang (MsgForm msg) = 'localize' lang msg
+  --   ...
+  -- @
+  --
+  data FormMessage
+    = FormMsgFieldRequired
+    deriving (Show)
+
+  instance Localizable FormMessage where
+    -- English strings
+    localize "en" FormMsgFieldRequired = Just "This field is required."
+
+    -- No translation, caller should try a different locale.
+    localize _lang _msg = Nothing
+
+
+  -- |
+  -- Class used to wrap the 'FormMessage' with your own message type.
+  --
+  -- Just point to the constructor within your own message catalog:
+  --
+  -- @
+  -- instance 'FromFormMessage' Messages where
+  --   'fromFormMessage' = MsgForm
+  -- @
+  --
+  class FromFormMessage l where
+    fromFormMessage :: FormMessage -> l
+
+
+  -- Using Forms -------------------------------------------------------------
 
 
   -- |
   -- Build a fresh form without using any request data.
   --
-  newForm :: (MonadAction m) => Text -> Form l m a -> m (View l)
-  newForm name = flip execStateT view . flip runReaderT env . unFormT . unForm
+  -- This function is used when the form is initially presented to the user.
+  -- It makes no sense to validate it, since the user have not entered any
+  -- input data or it has been seeded using a (most probably) valid object.
+  --
+  -- For example:
+  --
+  -- @
+  -- getEditItemR :: Natural -> Action ()
+  -- getEditItemR itemId = do
+  --   item <- getItem itemId
+  --   view <- 'newForm' "editItem" Nothing editItemForm
+  --   'sendHTML' do
+  --     form_ [method_ "POST"] do
+  --       horizontalForm_ view
+  --       horizontalFormButtons_ do
+  --        submitButton_ do
+  --          'lc_' MsgBtnSubmit
+  -- @
+  --
+  newForm :: (Monad m) => Text -> Maybe o -> Form l m o -> m (View l)
+  newForm name orig = flip execStateT view . flip runReaderT env . runFormT
     where
-      view = FormFields [] []
-      env  = Env { envPrefix = [name]
-                 , envParams = []
-                 , envFiles  = []
-                 , envCheck  = False
+      view = View [] []
+      env  = Env { envPrefix   = name
+                 , envParams   = Nothing
+                 , envFiles    = Nothing
+                 , envValue    = orig
+                 , envValidate = False
                  }
 
 
   -- |
-  -- Process the form using parameters in the query string.
+  -- Build the form using query string parameters.
   --
-  getForm :: (MonadAction m) => Text -> Form l m a -> m (View l, Maybe a)
-  getForm name form = do
+  -- The values are validated and corresponding notes are generated.
+  -- In case of success the resulting object is generated as well.
+  --
+  -- See 'postForm' for an example as they are used the same way.
+  --
+  getForm :: (MonadAction m) => Text -> Form l m o -> m (Maybe o, View l)
+  getForm name FormT{..} = do
     params <- getParams
 
-    let view = FormFields [] []
-        env  = Env { envPrefix = [name]
-                   , envParams = filter (("" /=) . strip . snd) params
-                   , envFiles  = []
-                   , envCheck  = True
+    let view = View [] []
+        env  = Env { envPrefix   = name
+                   , envParams   = Just params
+                   , envFiles    = Nothing
+                   , envValue    = Nothing
+                   , envValidate = True
                    }
 
-    (value, view') <- runStateT (runReaderT (unFormT $ unForm form) env) view
-
-    if hasErrors view'
-       then return (view', Nothing)
-       else return (view', value)
+    runStateT (flip runReaderT env runFormT) view
 
 
   -- |
-  -- Process the form using parameters in the request body.
+  -- Build the form using files and files from the submitted form.
   --
-  postForm :: (MonadAction m) => Text -> Form l m a -> m (View l, Maybe a)
-  postForm name form = do
+  -- The values are validated and corresponding notes are generated.
+  -- In case of success the resulting object is generated as well.
+  --
+  -- For example:
+  --
+  -- @
+  -- postEditItemR :: Natural -> Action ()
+  -- postEditItemR itemId = do
+  --   (result, view) <- 'postForm' "editItem" Nothing editItemForm
+  --
+  --   case result of
+  --     Nothing -> do
+  --       'sendHTML' do
+  --         form_ [method_ "POST"] do
+  --           horizontalForm_ view
+  --           horizontalFormButtons_ do
+  --            submitButton_ do
+  --              'lc_' MsgBtnSubmit
+  --
+  --     Just edit -> do
+  --       editItem edit
+  --       'redirect' "/items/"
+  -- @
+  --
+  postForm :: (MonadAction m) => Text -> Form l m o -> m (Maybe o, View l)
+  postForm name FormT{..} = do
     fields <- getFields
     files  <- getFiles
 
-    let view = FormFields [] []
-        env  = Env { envPrefix = [name]
-                   , envParams = filter (("" /=) . strip . snd) fields
-                   , envFiles  = files
-                   , envCheck  = True
+    let view = View [] []
+        env  = Env { envPrefix   = name
+                   , envParams   = Just fields
+                   , envFiles    = Just files
+                   , envValue    = Nothing
+                   , envValidate = True
                    }
 
-    (value, view') <- runStateT (runReaderT (unFormT $ unForm form) env) view
+    runStateT (flip runReaderT env runFormT) view
 
-    if hasErrors view'
-       then return (view', Nothing)
-       else return (view', value)
+
+  -- |
+  -- Build the form using only the supplied values.
+  --
+  -- The values are validated and corresponding notes are generated.
+  -- In case of success the resulting object is generated as well.
+  --
+  -- This function is included for completeness only.
+  -- You should probably use either 'newForm', 'getForm' or 'postForm'.
+  --
+  runForm :: (Monad m)
+          => Text -> [(Text, Text)] -> [(Text, FilePath)] -> Form l m o
+          -> m (Maybe o, View l)
+  runForm name params files FormT{..} = do
+    let view = View [] []
+        env  = Env { envPrefix   = name
+                   , envParams   = Just params
+                   , envFiles    = Just files
+                   , envValue    = Nothing
+                   , envValidate = True
+                   }
+
+    runStateT (flip runReaderT env runFormT) view
+
+
+  -- Building Forms ----------------------------------------------------------
+
+
+  -- |
+  -- Add a new form element with given label.
+  --
+  -- Individual controls are specified using the 'ElementT' monad.
+  -- Normal elements can contain all control types.
+  --
+  element :: (Monad m) => l -> ElementT l o m a -> FormT l o m a
+  element label body = FormT do
+    env <- ask
+
+    (res, new) <- lift $ lift do
+      let base = Element label []
+       in flip runStateT base $ flip runReaderT env $ runElementT body
+
+    modify \view@View{..} ->
+      view { viewElements = viewElements <> [new] }
+
+    return res
+
+
+  -- |
+  -- Add a new hidden form control.
+  --
+  -- TODO
+  --
+  hidden :: (Monad m, FromFormMessage l, Param v)
+         => Text
+         -> (o -> v)
+         -> ControlT 'InputFieldTag l o v m a
+         -> FormT l o m v
+  hidden name getter body = FormT do
+    env@Env{..} <- ask
+    (val, text) <- getParamOrig name (getter <$> envValue)
+
+    new <- lift $ lift do
+      let field = InputField "hidden" Nothing text
+          state = ControlState name field [] [] val
+       in flip execStateT state $ flip runReaderT env $ runControlT body
+
+    ctrl <- lift $ lift $ buildControl env new
+
+    modify \view@View{..} ->
+      view { viewControls = viewControls <> [ctrl] }
+
+    return $ csValue new
 
 
   -- |
   -- TODO
   --
-  csrfTokenField :: (MonadCsrf m) => l -> Form l m Text
-  csrfTokenField msg = Form do
-    Env{envCheck} <- ask
+  input :: (Monad m, FromFormMessage l, Param v)
+        => Text
+        -> (o -> v)
+        -> ControlT 'InputFieldTag l o v m a
+        -> ElementT l o m v
+  input name getter body = ElementT do
+    env@Env{..} <- ask
+    (val, text) <- getParamOrig name (getter <$> envValue)
 
-    name' <- makeName "csrftoken"
-    value <- fromMaybe "" <$> formParamMaybe name'
-    valid <- isTokenValid value
-    token <- generateToken
+    new <- lift $ lift do
+      let field = InputField "text" Nothing text
+          state = ControlState name field [] [] val
+       in flip execStateT state $ flip runReaderT env $ runControlT body
 
-    let view = HiddenField { viewName  = name'
-                           , viewValue = Just token
-                           , viewNotes = if envCheck && not valid
-                                            then [FormNote NoteError msg]
-                                            else []
-                           , viewAttrs = []
-                           }
+    ctrl <- lift $ lift $ buildControl env new
 
-    modify (<> view)
-    return $ Just token
+    modify \elt@Element{..} ->
+      elt { elemControls = elemControls <> [ctrl] }
 
-
-  -- |
-  -- TODO
-  --
-  hiddenField' :: (Monad m, Param a)
-               => Text -> FieldT l a m b -> Form l m a
-  hiddenField' name field = hiddenField name Nothing field
+    return $ csValue new
 
 
   -- |
   -- TODO
   --
-  hiddenField :: (Monad m, Param a)
-              => Text -> Maybe a -> FieldT l a m b -> Form l m a
-  hiddenField name orig field = Form do
-    name' <- makeName name
-    value <- formParamMaybe name'
-
-    let value' = value <|> orig
-        view   = HiddenField { viewName  = name'
-                             , viewValue = toParam <$> value'
-                             , viewNotes = []
-                             , viewAttrs = []
-                             }
-
-    (view', value'') <- runFieldT field value' view
-
-    modify (<> view')
-    return value''
+  input' :: (Monad m, FromFormMessage l, Param v)
+         => Text -> (o -> v) -> ElementT l o m v
+  input' name getter = input name getter $ return ()
 
 
   -- |
   -- TODO
   --
-  inputField' :: (Monad m, Param a)
-              => Text -> l -> FieldT l a m b -> Form l m a
-  inputField' name label field = inputField name label Nothing field
+  placeholder :: (Monad m) => l -> ControlT 'InputFieldTag l o v m ()
+  placeholder ph = ControlT do
+    modify \s@ControlState{..} ->
+      s { csField = csField { fieldPlacehold = Just ph } }
 
 
   -- |
   -- TODO
   --
-  inputField :: (Monad m, Param a)
-             => Text -> l -> Maybe a -> FieldT l a m b -> Form l m a
-  inputField name label orig field = Form do
-    name' <- makeName name
-    value <- formParamMaybe name'
+  select :: (Monad m, FromFormMessage l, Param v, Selectable v)
+         => Text
+         -> (o -> v)
+         -> ControlT 'SelectFieldTag l o v m a
+         -> ElementT l o m v
+  select name getter body = ElementT do
+    env@Env{..} <- ask
+    val <- getSelectParams name
 
-    let value' = value <|> orig
-        view   = InputField { viewName  = name'
-                            , viewLabel = label
-                            , viewValue = toParam <$> value'
-                            , viewNotes = []
-                            , viewAttrs = []
-                            }
+    new <- lift $ lift do
+      let val'  = val <|> (getter <$> envValue)
+          field = SelectField []
+          state = ControlState name field [] [] val'
+       in flip execStateT state $ flip runReaderT env $ runControlT body
 
-    (view', value'') <- runFieldT field value' view
+    ctrl <- lift $ lift $ buildControl env new
 
-    modify (<> view')
-    return value''
+    modify \elt@Element{..} ->
+      elt { elemControls = elemControls <> [ctrl] }
+
+    return $ csValue new
+
+
+  -- |
+  -- Configure 'select' options directly.
+  --
+  -- TODO: Add an example.
+  --
+  options :: (Monad m, Param v, Selectable v)
+          => [Option l] -> ControlT 'SelectFieldTag l o v m ()
+  options opts = ControlT do
+    modify \s@ControlState{..} ->
+      let opts' = case csValue of
+                    Nothing  -> opts
+                    Just val -> selectOptions val opts
+       in s { csField = csField { fieldOptions = opts' } }
+
+
+  -- |
+  -- Configure 'select' options using a list of values.
+  --
+  -- TODO: Add an example.
+  --
+  optionsFromValues :: (Monad m, Param v, Selectable v)
+                    => (v -> l) -> [v] -> ControlT 'SelectFieldTag l o v m ()
+  optionsFromValues label vals = options [ Option (label x) False (toParam x)
+                                   | x <- vals
+                                   ]
+
+
+  -- |
+  -- Configure 'select' options using enumeration.
+  --
+  -- TODO: Add an example.
+  --
+  optionsFromEnum :: (Monad m, Param v, Selectable v, Bounded v, Enum v)
+                  => (v -> l) -> ControlT 'SelectFieldTag l o v m ()
+  optionsFromEnum label = optionsFromValues label [minBound..maxBound]
 
 
   -- |
   -- TODO
   --
-  textArea' :: (Monad m, Param a)
-            => Text -> l -> FieldT l a m b -> Form l m a
-  textArea' name label field = textArea name label Nothing field
+  validate :: (Monad m) => (Maybe v -> m [Note l]) -> ControlT t l o v m ()
+  validate fn = ControlT do
+    modify \s@ControlState{..} ->
+      s { csValidators = csValidators <> [fn] }
 
 
   -- |
   -- TODO
   --
-  textArea :: (Monad m, Param a)
-            => Text -> l -> Maybe a -> FieldT l a m b -> Form l m a
-  textArea name label orig field = Form do
-    name' <- makeName name
-    value <- formParamMaybe name'
-
-    let value' = value <|> orig
-        view   = TextArea { viewName  = name'
-                          , viewLabel = label
-                          , viewValue = toParam <$> value'
-                          , viewNotes = []
-                          , viewAttrs = []
-                          }
-
-    (view', value'') <- runFieldT field value' view
-
-    modify (<> view')
-    return value''
+  check :: (Monad m) => (Maybe v -> [Note l]) -> ControlT t l o v m ()
+  check fn = validate (return . fn)
 
 
   -- |
   -- TODO
   --
-  selectField' :: (Monad m, Param a, Eq a)
-               => Text -> l -> (a -> l) -> [a]
-               -> FieldT l a m b -> Form l m a
-  selectField' name label optlabel options field
-    = selectField name label optlabel options Nothing field
+  note :: (Monad m) => Severity -> l -> ControlT t l o v m ()
+  note sev msg = validate (\_ -> return [Note sev msg])
 
 
   -- |
   -- TODO
   --
-  selectField :: (Monad m, Param a, Eq a)
-              => Text -> l -> (a -> l) -> [a] -> Maybe a
-              -> FieldT l a m b -> Form l m a
-  selectField name label optlabel options orig field = Form do
-    name' <- makeName name
-    value <- formParamMaybe name'
-
-    let value' = value <|> orig
-        opts   = [ (toParam x, optlabel x, Just x == value) | x <- options ]
-        view   = SelectField { viewName    = name'
-                             , viewLabel   = label
-                             , viewOptions = opts
-                             , viewNotes   = []
-                             , viewAttrs   = []
-                             , viewMulti   = False
-                             }
-
-    (view', value'') <- runFieldT field value' view
-
-    modify (<> view')
-    return value''
+  hint :: (Monad m, Typeable h) => h -> ControlT t l o v m ()
+  hint x = ControlT do
+    modify \s@ControlState{..} ->
+      s { csHints = csHints <> [toDyn x] }
 
 
-  -- |
-  -- TODO
-  --
-  selectFieldEnum' :: (Monad m, Param a, Eq a, Bounded a, Enum a)
-                   => Text -> l -> (a -> l) -> FieldT l a m b -> Form l m a
-  selectFieldEnum' name label optlabel field
-    = selectFieldEnum name label optlabel Nothing field
+  -- Debugging ---------------------------------------------------------------
 
 
-  -- |
-  -- Alternative to the 'selectField' for enumerable, bounded value types.
-  --
-  -- TODO: Example
-  --
-  selectFieldEnum :: (Monad m, Param a, Eq a, Bounded a, Enum a)
-                  => Text -> l -> (a -> l) -> Maybe a
-                  -> FieldT l a m b -> Form l m a
-  selectFieldEnum name label optlabel orig field
-    = selectField name label optlabel [minBound..maxBound] orig field
+  dumpForm :: (MonadIO m, Show l, Show o) => FormT l o m ()
+  dumpForm = FormT do
+    env <- ask
+
+    liftIO do
+      putStr "Form Dump:\n  "
+      putStrLn (show env)
+
+    return $ Just ()
 
 
-  -- |
-  -- TODO
-  --
-  multiSelectField' :: (Monad m, Param a, Eq a)
-                    => Text -> l -> (a -> l) -> [a]
-                    -> FieldT l [a] m b -> Form l m [a]
-  multiSelectField' name label optlabel options field
-    = multiSelectField name label optlabel options Nothing field
+  dumpControl :: (MonadIO m, Show l, Show o, Show v) => ControlT t l o v m ()
+  dumpControl = ControlT do
+    state <- get
+
+    liftIO do
+      putStr "Control Dump:\n  "
+      putStrLn (show state)
 
 
-  -- |
-  -- TODO
-  --
-  multiSelectField :: (Monad m, Param a, Eq a)
-                   => Text -> l -> (a -> l) -> [a] -> Maybe [a]
-                   -> FieldT l [a] m b -> Form l m [a]
-  multiSelectField name label optlabel options orig field = Form do
-    name'  <- makeName name
-    params <- formParams name'
-
-    let found  = nub $ params <> fromMaybe [] orig
-        opts   = [ (toParam x, optlabel x, x `elem` found) | x <- options ]
-        view   = SelectField { viewName    = name'
-                             , viewLabel   = label
-                             , viewOptions = opts
-                             , viewNotes   = []
-                             , viewAttrs   = []
-                             , viewMulti   = False
-                             }
-
-    (view', found') <- runFieldT field (Just found) view
-
-    modify (<> view')
-    return $ found'
+  -- Internal ----------------------------------------------------------------
 
 
-  -- |
-  -- TODO
-  --
-  opt :: (Monad m) => FieldT l a m ()
-  opt = return ()
+  getParamOrig :: (Monad m, Param v)
+               => Text -> Maybe v -> ReaderT (Env o) m (Maybe v, Text)
+  getParamOrig name orig = do
+    Env{..} <- ask
+
+    case envParams of
+      Nothing -> return (orig, maybe "" toParam orig)
+      Just ps -> let param = strip <$> lookup (envPrefix <> "." <> name) ps
+                  in return (fromParam =<< param, fromMaybe "" param)
 
 
-  -- |
-  -- TODO
-  --
-  req :: (Monad m) => l -> FieldT l a m ()
-  req label = do
-    whenChecking do
-      value <- fieldValue
-      case value of
-        Nothing -> addNote $ FormNote NoteError label
-        Just _v -> return ()
+  getSelectParams :: (Monad m, Param v, Selectable v)
+                  => Text -> ReaderT (Env o) m (Maybe v)
+  getSelectParams name = do
+    Env{..} <- ask
+    let name' = envPrefix <> "." <> name
+    return $ selectValues . lookupList name' =<< envParams
 
 
-  -- |
-  -- TODO
-  --
-  addNote :: (Monad m) => FormNote l -> FieldT l a m ()
-  addNote note = FieldT do
-    modify \(view, value) ->
-      ( view { viewNotes = viewNotes view <> [note] }
-      , value
-      )
+  lookupList :: (Eq a) => a -> [(a, b)] -> [b]
+  lookupList name = map snd . filter ((name ==) . fst)
 
 
-  -- |
-  -- TODO
-  --
-  addAttribute :: (Monad m, Typeable v) => Text -> v -> FieldT l a m ()
-  addAttribute name attr = FieldT do
-    modify \(view, value) ->
-      ( view { viewAttrs = viewAttrs view <> [(name, toDyn attr)] }
-      , value
-      )
+  buildControl :: (Monad m, FromFormMessage l)
+               => Env o
+               -> ControlState l v m
+               -> m (Control l)
+  buildControl Env{..} ControlState{..} = do
+    vres <- case envValidate of
+              True  -> sequence $ map ($ csValue) (required : csValidators)
+              False -> return []
+
+    return Control { ctrlName       = envPrefix <> "." <> csName
+                   , ctrlField      = csField
+                   , ctrlNotes      = mconcat vres
+                   , ctrlHints      = csHints
+                   }
 
 
-  -- |
-  -- TODO
-  --
-  processValue :: (Monad m) => (Maybe a -> Maybe a) -> FieldT l a m ()
-  processValue process = FieldT do
-    modify \(view, value) -> (view, process value)
-
-
-  -- |
-  -- TODO
-  --
-  whenChecking :: (Monad m) => FieldT l a m b -> FieldT l a m ()
-  whenChecking checkField = do
-    check <- fieldShouldCheck
-
-    if check
-       then checkField >> return ()
-       else return ()
-
-
-  -- |
-  -- TODO
-  --
-  fieldShouldCheck :: (Monad m) => FieldT l a m Bool
-  fieldShouldCheck = FieldT ask
-
-
-  -- |
-  -- TODO
-  --
-  fieldValue :: (Monad m) => FieldT l a m (Maybe a)
-  fieldValue = FieldT (snd <$> get)
-
-
-  -- |
-  -- Determine whether the view has any (possibly nested) errors.
-  --
-  hasErrors :: View l -> Bool
-  hasErrors FormFields{..} = any isErrorNote viewNotes || any hasErrors viewFields
-  hasErrors view           = any isErrorNote (viewNotes view)
-
-
-  -- Form Internals ---------------------------------------------------------
-
-
-  runFieldT :: (Monad m) => FieldT l a m b -> Maybe a -> View l
-             -> FormT l m (View l, Maybe a)
-  runFieldT field value view = do
-    Env{envCheck} <- ask
-    lift $ execStateT (runReaderT (unFieldT field) envCheck) (view, value)
-
-
-  isErrorNote :: FormNote l -> Bool
-  isErrorNote (FormNote NoteError _) = True
-  isErrorNote _else                  = False
-
-
-  formParamMaybe :: (Monad m, Param a) => Text -> FormT l m (Maybe a)
-  formParamMaybe name = do
-    Env{envParams} <- ask
-    return $ fromParam =<< lookup name envParams
-
-
-  formFileMaybe :: (Monad m) => Text -> FormT l m (Maybe FilePath)
-  formFileMaybe name = do
-    Env{envFiles} <- ask
-    return $ lookup name envFiles
-
-
-  formParams :: (Monad m, Param a) => Text -> FormT l m [a]
-  formParams name = do
-    Env{envParams} <- ask
-    let match = (name ==) . fst
-        conv  = fromParam . snd
-     in return $ mapMaybe conv $ filter match $ envParams
-
-
-  makeName :: (Monad m) => Text -> FormT l m Text
-  makeName name = do
-    Env{envPrefix} <- ask
-    return $ mconcat $ intersperse "." $ reverse (name : envPrefix)
+  required :: (Monad m, FromFormMessage l) => Maybe v -> m [Note l]
+  required Nothing = return [Note Danger $ fromFormMessage FormMsgFieldRequired]
+  required _else   = return []
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
