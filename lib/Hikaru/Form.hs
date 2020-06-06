@@ -47,6 +47,8 @@ module Hikaru.Form
   -- ** Elements
   , element
   , hidden
+  , hiddenValue
+  , token
 
   -- ** Controls
   , ElementT
@@ -67,6 +69,9 @@ module Hikaru.Form
   , validate
   , check
   , note
+
+  -- ** Value Adjustment
+  , adjust
 
   -- ** Rendering Hints
   , hint
@@ -98,6 +103,7 @@ where
   import Control.Monad.Trans (MonadTrans, lift)
   import Data.Text (Text, strip)
   import Hikaru.Action
+  import Hikaru.CSRF
   import Hikaru.Localize
   import Hikaru.Types
 
@@ -175,8 +181,7 @@ where
   -- |
   -- A form element that normally corresponds to a single row.
   --
-  -- An element can be either visible or hidden and can have multiple
-  -- controls. Hidden elements can have only 'input' controls.
+  -- Elements can have multiple controls.
   --
   data Element l
     = Element
@@ -372,11 +377,13 @@ where
   --
   data FormMessage
     = FormMsgFieldRequired
+    | FormMsgTokenInvalid
     deriving (Show)
 
   instance Localizable FormMessage where
     -- English strings
     localize "en" FormMsgFieldRequired = Just "This field is required."
+    localize "en" FormMsgTokenInvalid  = Just "The form has expired. Try again."
 
     -- No translation, caller should try a different locale.
     localize _lang _msg = Nothing
@@ -453,7 +460,11 @@ where
                    , envValidate = True
                    }
 
-    runStateT (flip runReaderT env runFormT) view
+    (res, view') <- runStateT (flip runReaderT env runFormT) view
+
+    if validates view'
+       then return (res, view')
+       else return (Nothing, view')
 
 
   -- |
@@ -496,7 +507,11 @@ where
                    , envValidate = True
                    }
 
-    runStateT (flip runReaderT env runFormT) view
+    (res, view') <- runStateT (flip runReaderT env runFormT) view
+
+    if validates view'
+       then return (res, view')
+       else return (Nothing, view')
 
 
   -- |
@@ -520,7 +535,11 @@ where
                    , envValidate = True
                    }
 
-    runStateT (flip runReaderT env runFormT) view
+    (res, view') <- runStateT (flip runReaderT env runFormT) view
+
+    if validates view'
+       then return (res, view')
+       else return (Nothing, view')
 
 
   -- Building Forms ----------------------------------------------------------
@@ -549,7 +568,7 @@ where
   -- |
   -- Add a new hidden form control.
   --
-  -- TODO
+  -- TODO: Add an example.
   --
   hidden :: (Monad m, FromFormMessage l, Param v)
          => Text
@@ -558,7 +577,7 @@ where
          -> FormT l o m v
   hidden name getter body = FormT do
     env@Env{..} <- ask
-    (val, text) <- getParamOrig name (getter <$> envValue)
+    (val, text) <- getParamOrig name (return $ getter <$> envValue)
 
     new <- lift $ lift do
       let field = InputField "hidden" Nothing text
@@ -574,6 +593,54 @@ where
 
 
   -- |
+  -- Add a new hidden form control with a value completely uncoupled
+  -- from the form object. Useful for anti-CSRF tokens and similar.
+  --
+  -- TODO: Add an example
+  --
+  hiddenValue :: (Monad m, FromFormMessage l, Param v)
+              => Text
+              -> m (Maybe v)
+              -> ControlT 'InputFieldTag l o v m a
+              -> FormT l o m v
+  hiddenValue name generate body = FormT do
+    env@Env{..} <- ask
+    (val, text) <- getParamOrig name generate
+
+    new <- lift $ lift do
+      let field = InputField "hidden" Nothing text
+          state = ControlState name field [] [] val
+       in flip execStateT state $ flip runReaderT env $ runControlT body
+
+    ctrl <- lift $ lift $ buildControl env new
+
+    modify \view@View{..} ->
+      view { viewControls = viewControls <> [ctrl] }
+
+    return $ csValue new
+
+
+  -- |
+  -- A hidden input holding an anti-CSRF token.
+  --
+  -- TODO: Add an example.
+  --
+  token :: (MonadCsrf m, FromFormMessage l) => Text -> FormT l o m Text
+  token name =
+    hiddenValue name (Just <$> generateToken) do
+      validate \case
+        Nothing -> do
+          return [Note Danger (fromFormMessage FormMsgTokenInvalid)]
+
+        Just tok -> do
+          valid <- isTokenValid tok
+          return
+            if valid
+               then []
+               else [Note Danger (fromFormMessage FormMsgTokenInvalid)]
+
+
+  -- |
   -- TODO
   --
   input :: (Monad m, FromFormMessage l, Param v)
@@ -583,7 +650,7 @@ where
         -> ElementT l o m v
   input name getter body = ElementT do
     env@Env{..} <- ask
-    (val, text) <- getParamOrig name (getter <$> envValue)
+    (val, text) <- getParamOrig name (return $ getter <$> envValue)
 
     new <- lift $ lift do
       let field = InputField "text" Nothing text
@@ -710,6 +777,22 @@ where
       s { csHints = csHints <> [toDyn x] }
 
 
+  -- |
+  -- Adjust control value.
+  --
+  adjust :: (Monad m, Param v)
+         => (Maybe v -> m (Maybe v))
+         -> ControlT 'InputFieldTag l o v m ()
+  adjust fn = ControlT do
+    ControlState{csValue} <- get
+    value' <- lift $ lift $ fn csValue
+
+    modify \s@ControlState{csField} ->
+      s { csValue = value'
+        , csField = csField { fieldValue = maybe "" toParam value' }
+        }
+
+
   -- Debugging ---------------------------------------------------------------
 
 
@@ -736,22 +819,26 @@ where
   -- Internal ----------------------------------------------------------------
 
 
-  getParamOrig :: (Monad m, Param v)
-               => Text -> Maybe v -> ReaderT (Env o) m (Maybe v, Text)
-  getParamOrig name orig = do
+  getParamOrig :: (Monad m, Monad (n m), MonadTrans n, Param v)
+               => Text -> m (Maybe v) -> ReaderT (Env o) (n m) (Maybe v, Text)
+  getParamOrig name generate = do
     Env{..} <- ask
 
     case envParams of
-      Nothing -> return (orig, maybe "" toParam orig)
-      Just ps -> let param = strip <$> lookup (envPrefix <> "." <> name) ps
-                  in return (fromParam =<< param, fromMaybe "" param)
+      Nothing -> do
+        orig <- lift $ lift $ generate
+        return (orig, maybe "" toParam orig)
+
+      Just ps -> do
+        let param = strip <$> lookup (envPrefix <> "__" <> name) ps
+         in return (fromParam =<< param, fromMaybe "" param)
 
 
   getSelectParams :: (Monad m, Param v, Selectable v)
                   => Text -> ReaderT (Env o) m (Maybe v)
   getSelectParams name = do
     Env{..} <- ask
-    let name' = envPrefix <> "." <> name
+    let name' = envPrefix <> "__" <> name
     return $ selectValues . lookupList name' =<< envParams
 
 
@@ -768,7 +855,7 @@ where
               True  -> sequence $ map ($ csValue) (required : csValidators)
               False -> return []
 
-    return Control { ctrlName       = envPrefix <> "." <> csName
+    return Control { ctrlName       = envPrefix <> "__" <> csName
                    , ctrlField      = csField
                    , ctrlNotes      = mconcat vres
                    , ctrlHints      = csHints
@@ -778,6 +865,17 @@ where
   required :: (Monad m, FromFormMessage l) => Maybe v -> m [Note l]
   required Nothing = return [Note Danger $ fromFormMessage FormMsgFieldRequired]
   required _else   = return []
+
+
+  -- |
+  -- Returns True only if no view notes are of the 'Danger' severity.
+  --
+  validates :: View l -> Bool
+  validates View{..} = all elemOk viewElements && all ctrlOk viewControls
+    where
+      elemOk Element{..} = all ctrlOk elemControls
+      ctrlOk Control{..} = all noteOk ctrlNotes
+      noteOk Note{..} = noteSeverity /= Danger
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
