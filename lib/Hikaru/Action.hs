@@ -83,6 +83,11 @@ module Hikaru.Action
   , getLanguages
   , setLanguages
 
+  -- ** Cacheing
+  , withCache
+  , dropCache
+  , dropCaches
+
   -- ** Finalizing
   , registerFinalizer
 
@@ -100,6 +105,7 @@ where
   import qualified Data.ByteString.Lazy as LBS
   import qualified Data.Text.Lazy as LT
   import qualified Network.Wai.Parse as Parse
+  import qualified Data.Map.Strict as Map
 
   import Control.Monad.Trans
   import Control.Monad.Trans.Resource
@@ -108,30 +114,30 @@ where
   import Data.ByteString (ByteString, length)
   import Data.String.Conversions
   import Data.Text (Text)
+  import Hikaru.Media
+  import Hikaru.Types
   import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
   import Web.Cookie
-  import Hikaru.Media
-  import Hikaru.Types
 
 
   -- |
-  -- Inside the 'MonadAction' the original 'Request' is available and we can
-  -- query it for information while building a fresh 'Response' to send out.
+  -- 'MonadAction' provides access to the original 'Request' and means to
+  -- build a 'Response' to send out.
   --
-  -- * Request header is always fully parsed.
+  -- * Request headers are always fully parsed.
   -- * Body is left untouched until you decide what to do with it.
   --
-  -- Be careful not to blow up your memory usage by reading a multi-gigabyte
-  -- attachment into a strict ByteString or something.
+  -- Be careful not to blow out your memory usage by reading a multi-gigabyte
+  -- attachment into a strict ByteString or something similar.
   --
   class (MonadIO m) => MonadAction m where
     -- |
-    -- Return the action environment, including the 'Request' object, cached
-    -- content from the user and the pending 'Response'.
+    -- Return the action environment, including the 'Request' object,
+    -- cached content from the user and the pending 'Response'.
     --
     getActionEnv :: m ActionEnv
 
@@ -188,6 +194,7 @@ where
       , aeBodyLimit    :: IORef Int64
       , aeBodyCounter  :: IORef Int64
       , aeLanguages    :: IORef [Text]
+      , aeCache        :: IORef (Map.Map Text Dynamic)
       }
 
 
@@ -258,6 +265,7 @@ where
                                 <*> newIORef (10 * 1024 * 1024)
                                 <*> newIORef 0
                                 <*> newIORef []
+                                <*> newIORef Map.empty
 
 
   -- Inspecting Request ------------------------------------------------------
@@ -271,7 +279,7 @@ where
 
 
   -- |
-  -- Obtain the request method, such as \"GET\" or \"POST\".
+  -- Obtain the request method, such as @GET@ or @POST@.
   --
   getMethod :: (MonadAction m) => m Method
   getMethod = requestMethod <$> getRequest
@@ -816,7 +824,7 @@ where
   -- values in a sensible way.
   --
   -- @
-  -- modifyHeader "Vary" $ maybe "Accept" (<> ", Accept")
+  -- modifyHeader 'hVary' $ maybe "Accept" (<> ", Accept")
   -- @
   --
   modifyHeader :: (MonadAction m)
@@ -1023,6 +1031,54 @@ where
   --
   setLanguages :: (MonadAction m) => [Text] -> m ()
   setLanguages = setActionField aeLanguages
+
+
+  -- Cacheing ----------------------------------------------------------------
+
+
+  -- |
+  -- Run the effect only if it was not found in the cache.
+  --
+  -- The cache is request-specific and will be dropped after the request
+  -- has been handled. It can be also dropped manually using 'dropCache'
+  -- or 'dropCaches'.
+  --
+  -- The first time 'withCache' is called with a given key, the resulting
+  -- value is stored in the cache under that key. Next time, the effect is
+  -- not executed and the cached value is returned instead.
+  --
+  -- Since 'Dynamic' is used under the wraps, reusing the same key with a
+  -- different type of value is safe and will result in overwriting the
+  -- old key.
+  --
+  withCache :: (MonadAction m, Typeable a) => Text -> m a -> m a
+  withCache key makeValue = do
+    cache <- getActionField aeCache
+
+    case fromDynamic =<< Map.lookup key cache of
+      Nothing -> do
+        value <- makeValue
+        modifyActionField aeCache (Map.insert key (toDyn value))
+        return value
+
+      Just value -> do
+        return value
+
+
+  -- |
+  -- Drop a single cached value.
+  --
+  dropCache :: (MonadAction m) => Text -> m ()
+  dropCache key = do
+    modifyActionField aeCache (Map.delete key)
+
+
+  -- |
+  -- Drop all cached values.
+  --
+  dropCaches :: (MonadAction m) => m ()
+  dropCaches = do
+    modifyActionField aeCache (const Map.empty)
 
 
   -- Finalizing --------------------------------------------------------------
