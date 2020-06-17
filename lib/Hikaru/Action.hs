@@ -88,6 +88,10 @@ module Hikaru.Action
   , dropCache
   , dropCaches
 
+  -- ** Configuration
+  , getConfigMaybe
+  , getConfigDefault
+
   -- ** Finalizing
   , registerFinalizer
 
@@ -103,9 +107,11 @@ where
   import BasePrelude hiding (length)
 
   import qualified Data.ByteString.Lazy as LBS
+  import qualified Data.Configurator as Cfg
+  import qualified Data.Configurator.Types as Cfg
+  import qualified Data.Map.Strict as Map
   import qualified Data.Text.Lazy as LT
   import qualified Network.Wai.Parse as Parse
-  import qualified Data.Map.Strict as Map
 
   import Control.Monad.Trans
   import Control.Monad.Trans.Resource
@@ -186,6 +192,7 @@ where
   data ActionEnv
     = ActionEnv
       { aeRequest      :: Request
+      , aeConfig       :: Cfg.Config
       , aeBody         :: IORef RequestBody
       , aeRespStatus   :: IORef Status
       , aeRespHeaders  :: IORef ResponseHeaders
@@ -205,9 +212,9 @@ where
   --
   -- Whole operation is bracketed to ensure all finalizers are run.
   --
-  respond :: (ActionEnv -> IO ()) -> Application
-  respond run req resp = do
-    env <- makeActionEnv req
+  respond :: (ActionEnv -> IO ()) -> Cfg.Config -> Application
+  respond run cfg req resp = do
+    env <- makeActionEnv cfg req
 
     bracket_ (return ()) (finalize env) do
       _   <- run env
@@ -255,17 +262,19 @@ where
   -- |
   -- Create the initial action environment from the 'Request'.
   --
-  makeActionEnv :: Request -> IO ActionEnv
-  makeActionEnv req = ActionEnv <$> pure req
-                                <*> newIORef BodyUnparsed
-                                <*> newIORef status200
-                                <*> newIORef []
-                                <*> newIORef (\st hs -> responseLBS st hs "")
-                                <*> newIORef (return ())
-                                <*> newIORef (10 * 1024 * 1024)
-                                <*> newIORef 0
-                                <*> newIORef []
-                                <*> newIORef Map.empty
+  makeActionEnv :: Cfg.Config -> Request -> IO ActionEnv
+  makeActionEnv cfg req =
+    ActionEnv <$> pure req
+              <*> pure cfg
+              <*> newIORef BodyUnparsed
+              <*> newIORef status200
+              <*> newIORef []
+              <*> newIORef (\st hs -> responseLBS st hs "")
+              <*> newIORef (return ())
+              <*> newIORef (10 * 1024 * 1024)
+              <*> newIORef 0
+              <*> newIORef []
+              <*> newIORef Map.empty
 
 
   -- Inspecting Request ------------------------------------------------------
@@ -1079,6 +1088,29 @@ where
   dropCaches :: (MonadAction m) => m ()
   dropCaches = do
     modifyActionField aeCache (const Map.empty)
+
+
+  -- Configuration -----------------------------------------------------------
+
+
+  -- |
+  -- Lookup a configuration value.
+  --
+  getConfigMaybe :: (MonadAction m, Cfg.Configured a) => Text -> m (Maybe a)
+  getConfigMaybe name = do
+    cfg <- aeConfig <$> getActionEnv
+    liftIO do
+      Cfg.lookup cfg name
+
+
+  -- |
+  -- Lookup a configuration value with a fallback to return if not found.
+  --
+  getConfigDefault :: (MonadAction m, Cfg.Configured a) => Text -> a -> m a
+  getConfigDefault name value = do
+    cfg <- aeConfig <$> getActionEnv
+    liftIO do
+      Cfg.lookupDefault value cfg name
 
 
   -- Finalizing --------------------------------------------------------------

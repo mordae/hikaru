@@ -7,18 +7,16 @@ Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
 Portability :  non-portable (ghc)
 
-CSRF mitigation utilities.
+This module provides CSRF mitigation utilities.
 -}
 
 module Hikaru.CSRF
-  ( MonadCsrf(..)
-  , generateToken
+  ( generateToken
   , isTokenValid
   )
 where
   import BasePrelude
 
-  import Control.Monad.Trans
   import Crypto.Hash
   import Crypto.MAC.HMAC
   import Data.ByteString (ByteString)
@@ -26,46 +24,33 @@ where
   import Data.Text (Text, splitOn)
   import Data.Time.Clock.POSIX (getPOSIXTime)
 
-
-  class (MonadIO m) => MonadCsrf m where
-    csrfTokenValidity :: m Int64
-    csrfTokenSecret   :: m Text
-
-    default csrfTokenValidity
-      :: (MonadTrans t, MonadCsrf n, m ~ t n) => m Int64
-    csrfTokenValidity = lift csrfTokenValidity
-    {-# INLINE csrfTokenValidity #-}
-
-    default csrfTokenSecret
-      :: (MonadTrans t, MonadCsrf n, m ~ t n) => m Text
-    csrfTokenSecret = lift csrfTokenSecret
-    {-# INLINE csrfTokenSecret #-}
+  import Hikaru.Action
 
 
   -- |
-  -- TODO
+  -- Generate an anti-CSRF token to be used with forms.
   --
-  generateToken :: (MonadCsrf m) => m Text
+  generateToken :: (MonadAction m) => m Text
   generateToken = do
     now    <- getTimestamp
-    secret <- csrfTokenSecret
+    secret <- getConfigDefault "csrf.secret" ""
 
     let signature = sign now secret
      in return $ mconcat [ cs (show now), ":", signature ]
 
 
   -- |
-  -- TODO
+  -- Verify that the anti-CSRF token is currently valid.
   --
-  isTokenValid :: (MonadCsrf m) => Text -> m Bool
+  isTokenValid :: (MonadAction m) => Text -> m Bool
   isTokenValid token = do
     case splitOn ":" token of
       [time, signature] -> do
         case readMaybe (cs time) of
           Just (timestamp :: Int64) -> do
             now    <- getTimestamp
-            valid  <- csrfTokenValidity
-            secret <- csrfTokenSecret
+            valid  <- getConfigDefault "csrf.validity" 86400
+            secret <- getConfigDefault "csrf.secret" ""
 
             if timestamp + valid >= now
                then return (sign timestamp secret == signature)

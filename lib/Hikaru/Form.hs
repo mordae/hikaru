@@ -625,7 +625,7 @@ where
   --
   -- TODO: Add an example.
   --
-  token :: (MonadCsrf m, FromFormMessage l) => Text -> FormT l o m Text
+  token :: (MonadAction m, FromFormMessage l) => Text -> FormT l o m Text
   token name =
     hiddenValue name (Just <$> generateToken) do
       validate \case
