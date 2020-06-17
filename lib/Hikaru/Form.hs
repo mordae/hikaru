@@ -381,6 +381,10 @@ where
     deriving (Show)
 
   instance Localizable FormMessage where
+    -- Czech strings
+    localize "cs" FormMsgFieldRequired = Just "Toto pole je povinné."
+    localize "cs" FormMsgTokenInvalid  = Just "Platnost formuláře vypršela. Zkuste to znovu."
+
     -- English strings
     localize "en" FormMsgFieldRequired = Just "This field is required."
     localize "en" FormMsgTokenInvalid  = Just "The form has expired. Try again."
