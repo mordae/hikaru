@@ -64,13 +64,13 @@ module Hikaru.Localize
   , selectLanguages
   )
 where
-  import BasePrelude
+  import Relude
 
+  import Data.List
   import Data.String.Conversions
-  import Data.Text (Text)
-  import Lucid
   import Hikaru.Action
   import Hikaru.Media
+  import Lucid
 
 
   -- |
@@ -122,14 +122,14 @@ where
 
   -- |
   -- Localize given message to the language indicated by the
-  -- 'getLanguages' of the current action. Uses 'localize' internally.
+  -- 'getLanguages' of the current action. Uses 'localize' internaly.
   --
   lc :: (MonadAction m, Localizable l) => l -> m Text
   lc msg = do
     langs <- getLanguages
 
     case mapMaybe (flip localize msg) langs of
-      []  -> return $ cs $ show msg
+      []  -> return $ show msg
       x:_ -> return x
 
 
@@ -142,7 +142,7 @@ where
     langs <- getLanguages
 
     case mapMaybe (flip localizeHtml msg) langs of
-      []  -> toHtml $ show msg
+      []  -> toHtml $ (show msg :: Text)
       x:_ -> x
 
 

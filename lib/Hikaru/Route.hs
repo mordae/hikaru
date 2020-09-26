@@ -55,11 +55,10 @@ module Hikaru.Route
   , Route
   )
 where
-  import BasePrelude hiding (head, delete)
+  import Relude hiding (get, put, head)
 
-  import Data.ByteString (ByteString)
   import Data.String.Conversions
-  import Data.Text (Text)
+  import Data.List (lookup)
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method (Method)
   import Network.Wai
@@ -208,7 +207,7 @@ where
   -- Select the best route with respect to the request.
   --
   choosePath :: Request -> [Request -> RouteResult a] -> RouteResult a
-  choosePath req = choose . map (req &)
+  choosePath req = choose . map ($ req)
     where
       choose :: [RouteResult a] -> RouteResult a
       choose []     = RouteFailed NotFound "" []

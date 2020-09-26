@@ -12,11 +12,10 @@ module Hikaru.Demo
   ( makeDemo
   )
 where
-  import BasePrelude hiding (for_, Option, Control)
+  import Relude hiding (for_, Option, get)
 
-  import Control.Monad.Reader
+  import Control.Concurrent.MVar (modifyMVar_)
   import Data.Aeson ()
-  import Data.Text (Text)
   import Hikaru
   import Lucid
   import Network.HTTP.Types.Header
@@ -146,7 +145,7 @@ where
     -- Present fancy HTML result.
     sendHTML do
       h1_ "Welcome!"
-      p_ $ "You are " >> toHtml (show n) >> ". visitor!"
+      p_ $ "You are " >> toHtml (show n :: Text) >> ". visitor!"
 
 
   getRootTextR :: Action ()
@@ -155,9 +154,9 @@ where
     n <- countVisitor
 
     -- Present a plain textual result.
-    sendString $ unlines [ "Welcome!"
-                         , "You are " <> show n <> ". visitor!"
-                         ]
+    sendText $ unlines [ "Welcome!"
+                       , "You are " <> show n <> ". visitor!"
+                       ]
 
 
   postEchoR :: Action ()
@@ -211,13 +210,13 @@ where
           th_ "Mode"
           th_ "Active"
 
-        for cases \Case{..} -> do
+        forM cases \Case{..} -> do
           tr_ do
-            td_ $ toHtml $ show caseId
+            td_ $ toHtml $ (show caseId :: Text)
             td_ $ toHtml $ caseName
             td_ $ toHtml $ caseRecNo
-            td_ $ toHtml $ show caseMode
-            td_ $ toHtml $ show caseActive
+            td_ $ toHtml $ (show caseMode :: Text)
+            td_ $ toHtml $ (show caseActive :: Text)
 
 
   -- Forms -------------------------------------------------------------------

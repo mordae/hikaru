@@ -14,10 +14,11 @@ module Hikaru.DemoSpec
   ( spec
   )
 where
-  import BasePrelude
+  import Relude hiding (get)
 
   import Hikaru.Demo
   import Hikaru.Test
+  import System.IO.Unsafe
 
 
   spec :: Spec

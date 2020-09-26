@@ -30,17 +30,17 @@ module Hikaru.Dispatch
   , TopLevel
   )
 where
-  import BasePrelude hiding (insert, lookup, app)
-  import qualified BasePrelude
+  import Relude
 
-  import Control.Monad.State (State, modify, execState)
+  import Control.Exception (catch)
   import Data.CaseInsensitive (original)
-  import Data.Map.Strict hiding (map)
-  import Data.Text (Text)
-  import Network.HTTP.Types.Header
-  import Network.Wai
+  import Data.List (lookup, deleteBy)
   import Hikaru.Route
   import Hikaru.Types
+  import Network.HTTP.Types.Header
+  import Network.Wai
+
+  import qualified Data.Map.Strict as Map
 
 
   -- |
@@ -120,7 +120,7 @@ where
                                    (\(exn, msg) -> mw (err exn msg) req' resp')
 
           err :: RequestError -> Text -> Application
-          err exn msg = case lookup exn envHandlers of
+          err exn msg = case Map.lookup exn envHandlers of
                           Just eh -> runner (eh exn msg)
                           Nothing -> defaultHandler exn msg
 
@@ -135,8 +135,8 @@ where
       fixup = modifyHeader "Vary" (maybe value (<> ", " <> value))
       value = mconcat $ intersperse ", " $ map original vs
 
-      modifyHeader n fn hs = (n, v') : deleteBy headerEq (n, v') hs
-        where v' = fn (BasePrelude.lookup n hs)
+      modifyHeader n fn hs = (n, v') : Data.List.deleteBy headerEq (n, v') hs
+        where v' = fn (Data.List.lookup n hs)
 
       headerEq (x, _) (y, _) = x == y
 
@@ -221,7 +221,7 @@ where
           -> Dispatch r TopLevel ()
   handler e h = Dispatch do
     modify \env@Env{envHandlers} ->
-      env { envHandlers = insert e h envHandlers }
+      env { envHandlers = Map.insert e h envHandlers }
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

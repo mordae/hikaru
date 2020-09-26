@@ -96,16 +96,16 @@ module Hikaru.Form
   , FromFormMessage(..)
   )
 where
-  import BasePrelude hiding (Option, Control)
+  import Relude hiding (Option, show, elem)
 
-  import Control.Monad.Reader (ReaderT, runReaderT, ask)
-  import Control.Monad.State (StateT, runStateT, execStateT, modify, get)
-  import Control.Monad.Trans (MonadTrans, lift)
-  import Data.Text (Text, strip)
+  import Data.Dynamic
+  import Data.List
+  import Data.Text (strip)
   import Hikaru.Action
   import Hikaru.CSRF
   import Hikaru.Localize
   import Hikaru.Types
+  import Text.Show
 
 
   data Env o
@@ -585,8 +585,8 @@ where
 
     new <- lift $ lift do
       let field = InputField "hidden" Nothing text
-          state = ControlState name field [] [] val
-       in flip execStateT state $ flip runReaderT env $ runControlT body
+          ctrst = ControlState name field [] [] val
+       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
 
     ctrl <- lift $ lift $ buildControl env new
 
@@ -613,8 +613,8 @@ where
 
     new <- lift $ lift do
       let field = InputField "hidden" Nothing text
-          state = ControlState name field [] [] val
-       in flip execStateT state $ flip runReaderT env $ runControlT body
+          ctrst = ControlState name field [] [] val
+       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
 
     ctrl <- lift $ lift $ buildControl env new
 
@@ -658,8 +658,8 @@ where
 
     new <- lift $ lift do
       let field = InputField "text" Nothing text
-          state = ControlState name field [] [] val
-       in flip execStateT state $ flip runReaderT env $ runControlT body
+          ctrst = ControlState name field [] [] val
+       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
 
     ctrl <- lift $ lift $ buildControl env new
 
@@ -701,8 +701,8 @@ where
     new <- lift $ lift do
       let val'  = val <|> (getter <$> envValue)
           field = SelectField []
-          state = ControlState name field [] [] val'
-       in flip execStateT state $ flip runReaderT env $ runControlT body
+          ctrst = ControlState name field [] [] val'
+       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
 
     ctrl <- lift $ lift $ buildControl env new
 
@@ -813,11 +813,11 @@ where
 
   dumpControl :: (MonadIO m, Show l, Show o, Show v) => ControlT t l o v m ()
   dumpControl = ControlT do
-    state <- get
+    ctrst <- get
 
     liftIO do
       putStr "Control Dump:\n  "
-      putStrLn (show state)
+      putStrLn (show ctrst)
 
 
   -- Internal ----------------------------------------------------------------

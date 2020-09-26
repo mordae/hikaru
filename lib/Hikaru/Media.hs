@@ -24,10 +24,10 @@ module Hikaru.Media
   , selectMedia
   )
 where
-  import BasePrelude hiding (group, find)
+  import Relude hiding (group, find, head)
+  import Relude.Unsafe (head)
 
   import Data.String.Conversions
-  import Data.Text (Text)
   import Data.Text.ICU
 
 

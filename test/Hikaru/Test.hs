@@ -21,11 +21,10 @@ module Hikaru.Test
   , module Test.Hspec
   )
 where
-  import BasePrelude
+  import Relude hiding (get)
 
-  import qualified Data.ByteString.Lazy as Lazy
+  import qualified Data.ByteString.Lazy as LBS
 
-  import Data.ByteString (ByteString)
   import Network.HTTP.Types
   import Network.Wai
   import Network.Wai.Internal
@@ -45,7 +44,7 @@ where
   post path headers body = srequest sreq
     where
       req = setPath defaultRequest path
-      sreq = SRequest { simpleRequestBody = Lazy.fromStrict body
+      sreq = SRequest { simpleRequestBody = LBS.fromStrict body
                       , simpleRequest     = req { requestMethod  = methodPost
                                                 , requestHeaders = headers
                                                 }

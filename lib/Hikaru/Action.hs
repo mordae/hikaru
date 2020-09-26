@@ -104,8 +104,9 @@ module Hikaru.Action
   , FilePath
   )
 where
-  import BasePrelude hiding (length)
+  import Relude
 
+  import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
   import qualified Data.Configurator as Cfg
   import qualified Data.Configurator.Types as Cfg
@@ -113,13 +114,13 @@ where
   import qualified Data.Text.Lazy as LT
   import qualified Network.Wai.Parse as Parse
 
-  import Control.Monad.Trans
+  import Control.Exception (throwIO, bracket_)
   import Control.Monad.Trans.Resource
   import Data.Aeson (Value, ToJSON, encode, eitherDecode')
   import Data.Binary.Builder
-  import Data.ByteString (ByteString, length)
+  import Data.Dynamic
+  import Data.List
   import Data.String.Conversions
-  import Data.Text (Text)
   import Hikaru.Media
   import Hikaru.Types
   import Lucid
@@ -127,6 +128,7 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
+  import System.IO.Unsafe
   import Web.Cookie
 
 
@@ -212,16 +214,16 @@ where
   --
   -- Whole operation is bracketed to ensure all finalizers are run.
   --
-  respond :: (ActionEnv -> IO ()) -> Cfg.Config -> Application
-  respond run cfg req resp = do
-    env <- makeActionEnv cfg req
+  respond :: (ActionEnv -> IO ()) -> Application
+  respond run req resp = do
+    env <- makeActionEnv req
 
     bracket_ (return ()) (finalize env) do
       _   <- run env
 
-      st  <- readIORef $ env & aeRespStatus
-      hs  <- readIORef $ env & aeRespHeaders
-      mk  <- readIORef $ env & aeRespMaker
+      st  <- readIORef $ aeRespStatus  $ env
+      hs  <- readIORef $ aeRespHeaders $ env
+      mk  <- readIORef $ aeRespMaker   $ env
 
       resp (mk st hs)
 
@@ -526,7 +528,7 @@ where
       if haveRead < limit
          then do
            chunk <- getChunk
-           writeIORef counter $ haveRead + fromIntegral (length chunk)
+           writeIORef counter $ haveRead + fromIntegral (BS.length chunk)
            return chunk
 
          else do
@@ -534,7 +536,7 @@ where
 
     where
       throwLimitIO :: Int64 -> IO a
-      throwLimitIO n = throwIO (PayloadTooLarge, cs msg :: Text)
+      throwLimitIO n = throwIO (PayloadTooLarge, msg :: Text)
         where msg = "Limit is " <> show n <> " bytes."
 
 
@@ -810,9 +812,9 @@ where
   -- If the header has been given multiple times, leave only one.
   --
   setHeader :: (MonadAction m) => HeaderName -> ByteString -> m ()
-  setHeader n v = modifyActionField aeRespHeaders modify
+  setHeader n v = modifyActionField aeRespHeaders update
     where
-      modify hs = (n, v) : deleteBy headerEq (n, v) hs
+      update hs = (n, v) : deleteBy headerEq (n, v) hs
 
 
   -- |
@@ -838,9 +840,9 @@ where
   --
   modifyHeader :: (MonadAction m)
                => HeaderName -> (Maybe ByteString -> ByteString) -> m ()
-  modifyHeader n fn = modifyActionField aeRespHeaders modify
+  modifyHeader n fn = modifyActionField aeRespHeaders update
     where
-      modify hs = (n, v') : deleteBy headerEq (n, v') hs
+      update hs = (n, v') : deleteBy headerEq (n, v') hs
         where v' = fn (lookup n hs)
 
 

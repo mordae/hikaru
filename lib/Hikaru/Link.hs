@@ -25,12 +25,10 @@ module Hikaru.Link
   , isActivePrefix
   )
 where
-  import BasePrelude
+  import Relude
 
   import Data.Binary.Builder
-  import Data.ByteString (ByteString)
   import Data.String.Conversions
-  import Data.Text (Text)
   import Lucid
   import Network.HTTP.Types.URI
   import Hikaru.Action

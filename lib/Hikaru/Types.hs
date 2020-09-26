@@ -17,11 +17,11 @@ module Hikaru.Types
   , defaultHandler
   )
 where
-  import BasePrelude
+  import Relude
 
   import Data.ByteString (ByteString)
   import Data.String.Conversions
-  import Data.Text (Text, pack, unpack)
+  import Data.Text (pack, unpack)
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import Network.Wai
