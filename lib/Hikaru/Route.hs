@@ -19,6 +19,7 @@ module Hikaru.Route
 
   -- ** Path Matching
   , seg
+  , (</)
   , arg
   , argWith
   , rest
@@ -226,6 +227,13 @@ where
   seg s = argWith \t -> if s == t
                            then Just t
                            else Nothing
+
+
+  -- |
+  -- Shortcut to append a path segment in a more readable way.
+  --
+  (</) :: Route a -> Text -> Route a
+  (</) r t = r <* seg t
 
 
   -- |

@@ -105,7 +105,7 @@ where
 
   runAction :: ModelEnv -> Action () -> Application
   runAction me act = do
-    respond $ \ae -> do
+    respond \ae -> do
       runReaderT (unAction act) (DemoEnv ae me)
 
 
@@ -115,23 +115,30 @@ where
       -- Register nicer 404 error handler.
       handler NotFound handleNotFound
 
+      -- Read configuration from environment.
+      wrapActions (updateConfigFromEnv >>)
+
       -- Negotiate content for the root page.
       route $ getRootHtmlR <$ get <* offerHTML
       route $ getRootTextR <$ get <* offerText
 
-      -- Disable caching for all the following endpoints.
+      -- Disable caching for these endpoints:
       wrapAction (defaultHeader hCacheControl "no-store" >>) do
         -- Present a simple greeting page.
-        route $ getHelloR <$ get <* seg "hello" <*> arg
+        route $ getHelloR <$ get </ "hello" <*> arg
                           <* offerText
 
         -- Present an echoing JSON API.
-        route $ postEchoR <$ post <* seg "api" <* seg "echo"
+        route $ postEchoR <$ post </ "api" </ "echo"
                           <* offerJSON <* acceptJSON
 
-        -- Case handling.
-        route $ postCaseR <$ post <* seg "case" <* seg "" <* acceptForm
-        route $ getCasesR <$ get  <* seg "case" <* seg "" <* offerJSON
+        -- Handle new cases.
+        route $ postCaseR <$ post </ "case" </ ""
+                          <* acceptForm
+
+        -- Handle case listing.
+        route $ getCasesR <$ get </ "case" </ ""
+                          <* offerJSON
 
 
   -- Handlers ----------------------------------------------------------------
