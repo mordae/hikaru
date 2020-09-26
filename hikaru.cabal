@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e297323a7b6cecac97f8dd18ae01703782f331a12328a6934ad0a62d7cb0daf3
+-- hash: 5ac50160b1396ef3e336b16f172ed703e020f37d729d4384049493c620bd5167
 
 name:           hikaru
 version:        0.1.0.0
@@ -55,7 +55,6 @@ library
     , binary >=0.8 && <0.9
     , bytestring >=0.10 && <0.11
     , case-insensitive >=1.2 && <1.3
-    , configurator >=0.3 && <0.4
     , containers >=0.6 && <0.7
     , cookie >=0.4 && <0.5
     , cryptonite >=0.26 && <0.27
@@ -94,7 +93,6 @@ test-suite spec
     , binary >=0.8 && <0.9
     , bytestring >=0.10 && <0.11
     , case-insensitive >=1.2 && <1.3
-    , configurator >=0.3 && <0.4
     , containers >=0.6 && <0.7
     , cookie >=0.4 && <0.5
     , cryptonite >=0.26 && <0.27

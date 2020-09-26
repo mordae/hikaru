@@ -29,10 +29,12 @@ where
   -- |
   -- Generate an anti-CSRF token to be used with forms.
   --
+  -- Uses the @CSRF_SECRET@ configuration key.
+  --
   generateToken :: (MonadAction m) => m Text
   generateToken = do
     now    <- getTimestamp
-    secret <- getConfigDefault "csrf.secret" ""
+    secret <- getConfigDefault "CSRF_SECRET" ""
 
     let signature = sign now secret
      in return $ mconcat [ show now, ":", signature ]
@@ -41,6 +43,9 @@ where
   -- |
   -- Verify that the anti-CSRF token is currently valid.
   --
+  -- Uses the @CSRF_SECRET@ and @CSRF_VALIDITY@ configuration keys.
+  -- Valididy defaults to 86400 seconds (24 hours).
+  --
   isTokenValid :: (MonadAction m) => Text -> m Bool
   isTokenValid token = do
     case splitOn ":" token of
@@ -48,8 +53,8 @@ where
         case readMaybe (cs time) of
           Just (timestamp :: Int64) -> do
             now    <- getTimestamp
-            valid  <- getConfigDefault "csrf.validity" 86400
-            secret <- getConfigDefault "csrf.secret" ""
+            valid  <- getConfigDefault "CSRF_VALIDITY" 86400
+            secret <- getConfigDefault "CSRF_SECRET" ""
 
             if timestamp + valid >= now
                then return (sign timestamp secret == signature)

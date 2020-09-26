@@ -89,6 +89,8 @@ module Hikaru.Action
   , dropCaches
 
   -- ** Configuration
+  , updateConfig
+  , updateConfigFromEnv
   , getConfigMaybe
   , getConfigDefault
 
@@ -108,8 +110,6 @@ where
 
   import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
-  import qualified Data.Configurator as Cfg
-  import qualified Data.Configurator.Types as Cfg
   import qualified Data.Map.Strict as Map
   import qualified Data.Text.Lazy as LT
   import qualified Network.Wai.Parse as Parse
@@ -128,6 +128,7 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
+  import System.Environment
   import System.IO.Unsafe
   import Web.Cookie
 
@@ -194,7 +195,7 @@ where
   data ActionEnv
     = ActionEnv
       { aeRequest      :: Request
-      , aeConfig       :: Cfg.Config
+      , aeConfig       :: IORef (Map.Map Text String)
       , aeBody         :: IORef RequestBody
       , aeRespStatus   :: IORef Status
       , aeRespHeaders  :: IORef ResponseHeaders
@@ -264,10 +265,10 @@ where
   -- |
   -- Create the initial action environment from the 'Request'.
   --
-  makeActionEnv :: Cfg.Config -> Request -> IO ActionEnv
-  makeActionEnv cfg req =
+  makeActionEnv :: Request -> IO ActionEnv
+  makeActionEnv req =
     ActionEnv <$> pure req
-              <*> pure cfg
+              <*> newIORef Map.empty
               <*> newIORef BodyUnparsed
               <*> newIORef status200
               <*> newIORef []
@@ -1096,23 +1097,41 @@ where
 
 
   -- |
+  -- Update configuration using supplied key-value pairs.
+  --
+  -- Request starts with an empty configuration.
+  --
+  updateConfig :: (MonadAction m) => [(Text, String)] -> m ()
+  updateConfig = modifyActionField aeConfig . Map.union . Map.fromList
+
+
+  -- |
+  -- Update configuration using the program environment.
+  --
+  updateConfigFromEnv :: (MonadAction m) => m ()
+  updateConfigFromEnv = do
+    env <- liftIO $ getEnvironment
+
+    let conv (k, v) = (cs k, v)
+     in updateConfig (map conv env)
+
+
+  -- |
   -- Lookup a configuration value.
   --
-  getConfigMaybe :: (MonadAction m, Cfg.Configured a) => Text -> m (Maybe a)
+  getConfigMaybe :: (MonadAction m, Read a) => Text -> m (Maybe a)
   getConfigMaybe name = do
-    cfg <- aeConfig <$> getActionEnv
-    liftIO do
-      Cfg.lookup cfg name
+    cfg <- getActionField aeConfig
+    return $ readMaybe =<< Map.lookup name cfg
 
 
   -- |
   -- Lookup a configuration value with a fallback to return if not found.
   --
-  getConfigDefault :: (MonadAction m, Cfg.Configured a) => Text -> a -> m a
+  getConfigDefault :: (MonadAction m, Read a) => Text -> a -> m a
   getConfigDefault name value = do
-    cfg <- aeConfig <$> getActionEnv
-    liftIO do
-      Cfg.lookupDefault value cfg name
+    cfg <- getActionField aeConfig
+    return $ fromMaybe value $ readMaybe =<< Map.lookup name cfg
 
 
   -- Finalizing --------------------------------------------------------------
