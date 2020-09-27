@@ -92,14 +92,14 @@ where
   -- app = dispatch runAction $ do
   --   'middleware' $ logStdoutDev
   --
-  --   'route' $ getRootR  \<$ 'get'
-  --   'route' $ getHelloR \<$ 'get' <* 'seg' "hello" \<*\> 'arg'
+  --   'route' $ getRootR  \<$ 'Hikaru.Route.get'
+  --   'route' $ getHelloR \<$ 'Hikaru.Route.get' \<\/ "hello" \<*\> 'arg'
   --
   --   'wrapRoute' needAuth $ do
-  --     'route' $ getAdminR \<$ 'get'  \<* 'seg' "admin"
-  --     'route' $ postPassR \<$ 'post' \<* 'seg' "admin" \<* 'seg' "password"
+  --     'route' $ getAdminR \<$ 'Hikaru.Route.get'  \<\/ "admin"
+  --     'route' $ postPassR \<$ 'Hikaru.Route.post' \<\/ "admin" \<\/ "password"
   --
-  --   'handle' 'NotFound' notFoundR
+  --   'handler' 'NotFound' notFoundR
   -- @
   --
   dispatch :: forall r. (r -> Application)
@@ -201,8 +201,8 @@ where
   -- app = 'dispatch' runAction $ do
   --   'wrapRoutes' ('Hikaru.Action.defaultHeader' hCacheControl "no-cache" >>)
   --
-  --   'route' $ getRootR  \<$ 'get'
-  --   'route' $ getHelloR \<$ 'get' <* 'seg' "hello" \<*\> 'arg'
+  --   'route' $ getRootR  \<$ 'Hikaru.Route.get'
+  --   'route' $ getHelloR \<$ 'Hikaru.Route.get' \<\/ "hello" \<*\> 'arg'
   -- @
   --
   wrapActions :: (r -> r) -> Dispatch r l ()

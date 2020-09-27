@@ -110,15 +110,15 @@ where
       -- Disable caching for all the following endpoints.
       wrapAction (defaultHeader hCacheControl "no-store" >>) $ do
         -- Return search results and repeat the form.
-        route $ getSearchHtmlR <$ get <* seg "search"
+        route $ getSearchHtmlR <$ get </ "search"
                                <* offerHTML
 
         -- Present a simple greeting page.
-        route $ getHelloR <$ get <* seg "hello" <*> arg
+        route $ getHelloR <$ get </ "hello" <*> arg
                           <* offerText
 
         -- Create an echoing JSON API.
-        route $ postEchoR <$ post <* seg "api" <* seg "echo"
+        route $ postEchoR <$ post </ "api" </ "echo"
                           <* offerJSON <* acceptJSON
 
 
