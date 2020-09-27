@@ -27,6 +27,7 @@ default-extensions:
   - DataKinds
   - DefaultSignatures
   - DeriveGeneric
+  - FlexibleContexts
   - FlexibleInstances
   - GADTs
   - GeneralizedNewtypeDeriving
@@ -45,7 +46,6 @@ default-extensions:
 dependencies:
   - aeson              >= 1.4  && <1.5
   - base               >= 4.13 && <4.14
-  - relude             >= 0.7  && <0.8
   - binary             >= 0.8  && <0.9
   - bytestring         >= 0.10 && <0.11
   - case-insensitive   >= 1.2  && <1.3
@@ -54,7 +54,9 @@ dependencies:
   - cryptonite         >= 0.26 && <0.27
   - http-types         >= 0.12 && <0.13
   - lucid              >= 2.9  && <2.10
+  - memory             >= 0.15 && <0.16
   - mtl                >= 2.2  && <2.3
+  - relude             >= 0.7  && <0.8
   - resourcet          >= 1.2  && <1.3
   - string-conversions >= 0.4  && <0.5
   - text               >= 1.2  && <1.3
@@ -70,6 +72,7 @@ library:
   exposed-modules:
     - Hikaru
     - Hikaru.Action
+    - Hikaru.Config
     - Hikaru.CSRF
     - Hikaru.Dispatch
     - Hikaru.Form

@@ -100,23 +100,21 @@ where
   makeDemo :: IO Application
   makeDemo = do
     model <- makeModelEnv 0
-    return $ makeApplication model
+    cfg   <- configFromEnv
+    return $ makeApplication model cfg
 
 
-  runAction :: ModelEnv -> Action () -> Application
-  runAction me act = do
-    respond \ae -> do
+  runAction :: ModelEnv -> Config -> Action () -> Application
+  runAction me cfg act = do
+    respond cfg \ae -> do
       runReaderT (unAction act) (DemoEnv ae me)
 
 
-  makeApplication :: ModelEnv -> Application
-  makeApplication me = do
-    dispatch (runAction me) do
+  makeApplication :: ModelEnv -> Config -> Application
+  makeApplication me cfg = do
+    dispatch (runAction me cfg) do
       -- Register nicer 404 error handler.
       handler NotFound handleNotFound
-
-      -- Read configuration from environment.
-      wrapActions (updateConfigFromEnv >>)
 
       -- Negotiate content for the root page.
       route $ getRootHtmlR <$ get <* offerHTML

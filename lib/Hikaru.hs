@@ -14,6 +14,7 @@ module Hikaru
   (
   -- * Exported Modules
     module Hikaru.Action
+  , module Hikaru.Config
   , module Hikaru.CSRF
   , module Hikaru.Dispatch
   , module Hikaru.Form
@@ -25,6 +26,7 @@ module Hikaru
   )
 where
   import Hikaru.Action
+  import Hikaru.Config
   import Hikaru.CSRF
   import Hikaru.Dispatch
   import Hikaru.Form

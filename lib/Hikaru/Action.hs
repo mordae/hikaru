@@ -89,8 +89,6 @@ module Hikaru.Action
   , dropCaches
 
   -- ** Configuration
-  , updateConfig
-  , updateConfigFromEnv
   , getConfigMaybe
   , getConfigDefault
 
@@ -121,6 +119,7 @@ where
   import Data.Dynamic
   import Data.List
   import Data.String.Conversions
+  import Hikaru.Config
   import Hikaru.Media
   import Hikaru.Types
   import Lucid
@@ -128,7 +127,6 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
-  import System.Environment
   import System.IO.Unsafe
   import Web.Cookie
 
@@ -195,7 +193,7 @@ where
   data ActionEnv
     = ActionEnv
       { aeRequest      :: Request
-      , aeConfig       :: IORef (Map.Map Text String)
+      , aeConfig       :: Config
       , aeBody         :: IORef RequestBody
       , aeRespStatus   :: IORef Status
       , aeRespHeaders  :: IORef ResponseHeaders
@@ -215,9 +213,9 @@ where
   --
   -- Whole operation is bracketed to ensure all finalizers are run.
   --
-  respond :: (ActionEnv -> IO ()) -> Application
-  respond run req resp = do
-    env <- makeActionEnv req
+  respond :: Config -> (ActionEnv -> IO ()) -> Application
+  respond cfg run req resp = do
+    env <- makeActionEnv cfg req
 
     bracket_ (return ()) (finalize env) do
       _   <- run env
@@ -263,21 +261,23 @@ where
 
 
   -- |
-  -- Create the initial action environment from the 'Request'.
+  -- Create an initial action environment to handle given 'Request'.
   --
-  makeActionEnv :: Request -> IO ActionEnv
-  makeActionEnv req =
-    ActionEnv <$> pure req
-              <*> newIORef Map.empty
-              <*> newIORef BodyUnparsed
-              <*> newIORef status200
-              <*> newIORef []
-              <*> newIORef (\st hs -> responseLBS st hs "")
-              <*> newIORef (return ())
-              <*> newIORef (10 * 1024 * 1024)
-              <*> newIORef 0
-              <*> newIORef []
-              <*> newIORef Map.empty
+  makeActionEnv :: Config -> Request -> IO ActionEnv
+  makeActionEnv cfg req = do
+    aeRequest     <- pure req
+    aeConfig      <- pure cfg
+    aeBody        <- newIORef BodyUnparsed
+    aeRespStatus  <- newIORef status200
+    aeRespHeaders <- newIORef []
+    aeRespMaker   <- newIORef (\st hs -> responseLBS st hs "")
+    aeFinalize    <- newIORef (return ())
+    aeBodyLimit   <- newIORef (10 * 1024 * 1024)
+    aeBodyCounter <- newIORef 0
+    aeLanguages   <- newIORef []
+    aeCache       <- newIORef Map.empty
+
+    return ActionEnv{..}
 
 
   -- Inspecting Request ------------------------------------------------------
@@ -1097,41 +1097,21 @@ where
 
 
   -- |
-  -- Update configuration using supplied key-value pairs.
-  --
-  -- Request starts with an empty configuration.
-  --
-  updateConfig :: (MonadAction m) => [(Text, String)] -> m ()
-  updateConfig = modifyActionField aeConfig . Map.union . Map.fromList
-
-
-  -- |
-  -- Update configuration using the program environment.
-  --
-  updateConfigFromEnv :: (MonadAction m) => m ()
-  updateConfigFromEnv = do
-    env <- liftIO $ getEnvironment
-
-    let conv (k, v) = (cs k, v)
-     in updateConfig (map conv env)
-
-
-  -- |
   -- Lookup a configuration value.
   --
-  getConfigMaybe :: (MonadAction m, Read a) => Text -> m (Maybe a)
+  getConfigMaybe :: (MonadAction m, Param a) => Text -> m (Maybe a)
   getConfigMaybe name = do
-    cfg <- getActionField aeConfig
-    return $ readMaybe =<< Map.lookup name cfg
+    ActionEnv{aeConfig} <- getActionEnv
+    return $ fromParam =<< Map.lookup name aeConfig
 
 
   -- |
   -- Lookup a configuration value with a fallback to return if not found.
   --
-  getConfigDefault :: (MonadAction m, Read a) => Text -> a -> m a
+  getConfigDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getConfigDefault name value = do
-    cfg <- getActionField aeConfig
-    return $ fromMaybe value $ readMaybe =<< Map.lookup name cfg
+    ActionEnv{aeConfig} <- getActionEnv
+    return $ fromMaybe value $ fromParam =<< Map.lookup name aeConfig
 
 
   -- Finalizing --------------------------------------------------------------
