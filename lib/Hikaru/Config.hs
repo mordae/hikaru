@@ -30,14 +30,14 @@ module Hikaru.Config
   , generateSecret
   )
 where
-  import Relude hiding (lines)
+  import Relude hiding (drop, lines, isPrefixOf, length)
 
   import qualified Data.Map as Map
 
   import Crypto.Random.Entropy
   import Data.ByteArray.Encoding
-  import Data.List (lines, span)
   import Data.String.Conversions
+  import Data.Text hiding (map)
   import System.Environment
 
 
@@ -68,11 +68,24 @@ where
   -- let cfg = env <> def
   -- @
   --
+  -- Configuration file format is approximately this:
+  --
+  -- @
+  -- # How many seconds before forms need to be reloaded?
+  -- CSRF_VALIDITY = 3600
+  --
+  -- # Secret key to protect against CSRF. Don't tell anyone!
+  -- CSRF_SECRET   = Ain9eec8aighoiri
+  -- @
+  --
   configFromFile :: (MonadIO m) => FilePath -> m Config
-  configFromFile path = Map.fromList <$> map parse <$> lines <$> readFile path
+  configFromFile path = Map.fromList <$> parseFile <$> readFileText path
     where
-      parse       = conv . span (/= '=')
-      conv (k, v) = (cs k, cs $ drop 1 v)
+      parseFile   = mapMaybe parseLine . lines
+      parseLine   = fmap tidy . fmap parseKV . reject . strip
+      parseKV     = fmap (drop 1) . span (/= '=')
+      reject      = guarded (not . isPrefixOf "#") <=< guarded ("" /=)
+      tidy (k, v) = (strip k, strip v)
 
 
   -- |
@@ -84,7 +97,6 @@ where
   configDefault :: (MonadIO m) => m Config
   configDefault = do
     secret <- generateSecret 16
-
     return $ Map.fromList [ ("CSRF_SECRET",   secret)
                           , ("CSRF_VALIDITY", "86400")
                           ]
