@@ -26,6 +26,10 @@ module Hikaru.Config
   , configFromFile
   , configDefault
 
+  -- * Reading Config
+  , configGetMaybe
+  , configGetDefault
+
   -- * Secrets
   , generateSecret
   )
@@ -38,6 +42,7 @@ where
   import Data.ByteArray.Encoding
   import Data.String.Conversions
   import Data.Text hiding (map)
+  import Hikaru.Types
   import System.Environment
 
 
@@ -100,6 +105,20 @@ where
     return $ Map.fromList [ ("CSRF_SECRET",   secret)
                           , ("CSRF_VALIDITY", "86400")
                           ]
+
+
+  -- |
+  -- Try to obtain value of a configuration key.
+  --
+  configGetMaybe :: (Param a) => Text -> Config -> Maybe a
+  configGetMaybe name cfg = fromParam =<< Map.lookup name cfg
+
+
+  -- |
+  -- Obtain value of a configuration key or the provided default.
+  --
+  configGetDefault :: (Param a) => Text -> a -> Config -> a
+  configGetDefault name value = fromMaybe value . configGetMaybe name
 
 
   -- |
