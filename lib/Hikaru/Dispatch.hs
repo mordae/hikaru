@@ -69,8 +69,8 @@ where
 
   data Env r
     = Env
-      { envRouteW      :: Route r -> Route r
-      , envActionW     :: r -> r
+      { envRouteWrap   :: Route r -> Route r
+      , envActionWrap  :: r -> r
       , envHandlers    :: Map RequestError (RequestError -> Text -> r)
       , envMiddleware  :: Middleware
       , envRoutes      :: [Route r]  -- in reverse order
@@ -152,7 +152,7 @@ where
   route :: Route r -> Dispatch r l ()
   route rt = Dispatch do
     modify \env@Env{..} ->
-      env { envRoutes = envRouteW (fmap envActionW rt) : envRoutes }
+      env { envRoutes = envRouteWrap (fmap envActionWrap rt) : envRoutes }
 
 
   -- |
@@ -167,7 +167,7 @@ where
   wrapRoute wrapper disp = Dispatch do
     modify \env ->
       let env' = execState (unDispatch disp)
-                           (env { envRouteW = envRouteW env . wrapper })
+                           (env { envRouteWrap = envRouteWrap env . wrapper })
 
        in env { envRoutes = envRoutes env' <> envRoutes env }
 
@@ -177,7 +177,7 @@ where
   --
   wrapRoutes :: (Route r -> Route r) -> Dispatch r l ()
   wrapRoutes wrapper = Dispatch do
-    modify \env -> env { envRouteW = envRouteW env . wrapper }
+    modify \env -> env { envRouteWrap = envRouteWrap env . wrapper }
 
 
   -- |
@@ -187,7 +187,7 @@ where
   wrapAction wrapper disp = Dispatch do
     modify \env ->
       let env' = execState (unDispatch disp)
-                           (env { envActionW = envActionW env . wrapper })
+                           (env { envActionWrap = envActionWrap env . wrapper })
        in env { envRoutes = envRoutes env' <> envRoutes env }
 
 
@@ -207,7 +207,7 @@ where
   --
   wrapActions :: (r -> r) -> Dispatch r l ()
   wrapActions wrapper = Dispatch do
-    modify \env -> env { envActionW = envActionW env . wrapper }
+    modify \env -> env { envActionWrap = envActionWrap env . wrapper }
 
 
   -- |
