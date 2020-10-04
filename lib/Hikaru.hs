@@ -16,6 +16,7 @@ module Hikaru
     module Hikaru.Action
   , module Hikaru.Config
   , module Hikaru.CSRF
+  , module Hikaru.Develop
   , module Hikaru.Dispatch
   , module Hikaru.Form
   , module Hikaru.Link
@@ -28,6 +29,7 @@ where
   import Hikaru.Action
   import Hikaru.Config
   import Hikaru.CSRF
+  import Hikaru.Develop
   import Hikaru.Dispatch
   import Hikaru.Form
   import Hikaru.Link

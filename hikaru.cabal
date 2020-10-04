@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8bbf377869281f273f43485c46ccce646be610521dbf18fa016b0762e07d767f
+-- hash: f2e507d7c6d6469807c9edd22fe9f5628b08203e542661f8e917468fd1f856e8
 
 name:           hikaru
 version:        0.1.0.0
@@ -45,6 +45,7 @@ library
       Hikaru.Route
       Hikaru.Types
   other-modules:
+      Hikaru.Develop
       Paths_hikaru
   hs-source-dirs:
       lib
@@ -59,6 +60,7 @@ library
     , containers >=0.6 && <0.7
     , cookie >=0.4 && <0.5
     , cryptonite >=0.26 && <0.27
+    , foreign-store >=0.2 && <0.3
     , http-types >=0.12 && <0.13
     , lucid >=2.9 && <2.10
     , memory >=0.15 && <0.16
@@ -98,6 +100,7 @@ test-suite spec
     , containers >=0.6 && <0.7
     , cookie >=0.4 && <0.5
     , cryptonite >=0.26 && <0.27
+    , foreign-store >=0.2 && <0.3
     , hikaru
     , hspec
     , http-types >=0.12 && <0.13
