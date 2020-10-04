@@ -12,11 +12,11 @@ This module provides means to read configuration from environment and files.
 Example:
 
 @
-  base <- 'configDefault'
-  file <- 'configFromFile' \"site.env\"
-  env  <- 'configFromEnv'
+base <- 'configDefault'
+file <- 'configFromFile' \"site.env\"
+env  <- 'configFromEnv'
 
-  let cfg = env <> file <> base
+let cfg = env <> file <> base
 @
 -}
 

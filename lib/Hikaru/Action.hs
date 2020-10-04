@@ -354,7 +354,7 @@ where
 
   -- |
   -- Obtain the Content-Type header value or the default value of
-  -- @\"application/octet-stream\"@ (true, but meaningless).
+  -- @\"application/octet-stream\"@ (always true, but meaningless).
   --
   getContentType :: (MonadAction m) => m Media
   getContentType = do
