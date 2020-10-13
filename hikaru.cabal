@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f2e507d7c6d6469807c9edd22fe9f5628b08203e542661f8e917468fd1f856e8
+-- hash: 3bf5d3e31633e3ccf1a02683302849a23a53f7b621bf6e24759bdca47151b60a
 
 name:           hikaru
 version:        0.1.0.0
@@ -73,6 +73,8 @@ library
     , time >=1.9 && <1.10
     , wai >=3.2 && <3.3
     , wai-extra >=3.0 && <3.1
+    , wai-websockets >=3.0 && <3.1
+    , websockets >=0.12 && <0.13
   default-language: Haskell2010
 
 test-suite spec
@@ -115,4 +117,6 @@ test-suite spec
     , time >=1.9 && <1.10
     , wai >=3.2 && <3.3
     , wai-extra >=3.0 && <3.1
+    , wai-websockets >=3.0 && <3.1
+    , websockets >=0.12 && <0.13
   default-language: Haskell2010

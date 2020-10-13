@@ -38,6 +38,9 @@ module Hikaru.Route
   , patch
   , delete
 
+  -- *** WebSockets
+  , websocket
+
   -- *** Request Content
   , acceptContent
   , acceptForm
@@ -58,13 +61,14 @@ module Hikaru.Route
 where
   import Relude hiding (get, put, head)
 
-  import Data.String.Conversions
   import Data.List (lookup)
+  import Data.String.Conversions
+  import Hikaru.Media
+  import Hikaru.Types
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method (Method)
   import Network.Wai
-  import Hikaru.Media
-  import Hikaru.Types
+  import Network.Wai.Handler.WebSockets
 
 
   -- |
@@ -358,6 +362,16 @@ where
   --
   delete :: Route ()
   delete = method "DELETE"
+
+
+  -- |
+  -- Match a WebSocket upgrade request.
+  --
+  websocket :: Route ()
+  websocket = score \req ->
+    if isWebSocketsReq req
+       then Suitable 1.0
+       else Unsuitable BadRequest "WebSocket Upgrade Expected"
 
 
   -- |

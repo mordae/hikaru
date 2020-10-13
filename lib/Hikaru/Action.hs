@@ -76,6 +76,15 @@ module Hikaru.Action
   , setResponseStream
   , setResponseRaw
 
+  -- ** WebSockets
+  , setFrameLimit
+  , setMessageLimit
+  , setResponseWS
+  , WebSocket
+  , wsSendText
+  , wsSendBinary
+  , wsReceive
+
   -- ** Errors
   , throwError
 
@@ -127,8 +136,11 @@ where
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
   import Network.Wai
+  import Network.Wai.Handler.WebSockets
   import System.IO.Unsafe
   import Web.Cookie
+
+  import qualified Network.WebSockets as WS
 
 
   -- |
@@ -203,6 +215,8 @@ where
       , aeBodyCounter  :: IORef Int64
       , aeLanguages    :: IORef [Text]
       , aeCache        :: IORef (Map.Map Text Dynamic)
+      , aeMsgLimit     :: IORef Int64
+      , aeFrameLimit   :: IORef Int64
       }
 
 
@@ -258,6 +272,8 @@ where
       -- ^ Body has been successfully parsed as a JSON.
     | BodyBytes LBS.ByteString
       -- ^ Body has been successfully read in raw.
+    | BodyWebSocket
+      -- ^ Body is being used for WebSockets communication.
 
 
   -- |
@@ -276,6 +292,8 @@ where
     aeBodyCounter <- newIORef 0
     aeLanguages   <- newIORef []
     aeCache       <- newIORef Map.empty
+    aeMsgLimit    <- newIORef (1 * 1024 * 1024)
+    aeFrameLimit  <- newIORef (1 * 1024 * 1024)
 
     return ActionEnv{..}
 
@@ -995,17 +1013,18 @@ where
 
 
   -- |
-  -- Escape the established narrative of 'Response' bodies and take over
-  -- the connection for any purpose you deep practical. Ideal for WebSockets
-  -- and such.
+  -- Create a raw response. This is useful for "upgrade" situations,
+  -- where an application requests for the server to grant it raw
+  -- network access.
   --
-  -- The secondary 'Response' is used when upgrading is not supported by
-  -- the underlying web server technology.
+  -- This function requires a backup response to be provided, for the
+  -- case where the handler in question does not support such upgrading.
   --
-  -- NOTE: Ignores both status and headers.
+  -- Ignores both status and headers set so far. You need to emit these
+  -- yourself, if needed.
   --
-  -- NOTE: Try not to read from the body before starting the raw response
-  --       or risk encountering an undefined behavior.
+  -- Try not to read from the body before starting the raw response
+  -- or risk encountering undefined behavior.
   --
   setResponseRaw :: (MonadAction m)
                  => (IO ByteString -> (ByteString -> IO ()) -> IO ())
@@ -1013,6 +1032,127 @@ where
                  -> m ()
   setResponseRaw comm resp = do
     setActionField aeRespMaker \_st _hs -> responseRaw comm resp
+
+
+  -- WebSockets --------------------------------------------------------------
+
+
+  -- |
+  -- Set limit (in bytes) for reading the individual WebSocket frames
+  -- in order to prevent memory exhaustion.
+  --
+  -- Default limit is 1 MiB, which is too little for file transmission
+  -- and too much for simple notifications. You might even consider
+  -- lowering it down to e.g. 125 bytes for sockets that are supposed
+  -- to communicate in one way only.
+  --
+  setFrameLimit :: (MonadAction m) => Int64 -> m ()
+  setFrameLimit = setActionField aeFrameLimit
+
+
+  -- |
+  -- Set limit (in bytes) for reading the individual WebSocket messages
+  -- in order to prevent memory exhaustion.
+  --
+  -- Default limit is 1 MiB, which is too little for file transmission
+  -- and too much for simple notifications. You might even consider
+  -- lowering it down to e.g. 125 bytes for sockets that are supposed
+  -- to communicate in one way only.
+  --
+  -- Single message may or may not consist of multiple frames.
+  --
+  setMessageLimit :: (MonadAction m) => Int64 -> m ()
+  setMessageLimit = setActionField aeMsgLimit
+
+
+  -- |
+  -- Attempt to upgrade the connection to a WebSocket.
+  --
+  -- The 'WebSocket' monad can be used to communicate with the client.
+  --
+  -- Sets up an automatic keep-alive with a 30s ping interval.
+  --
+  setResponseWS :: (MonadAction m) => WebSocket () -> m ()
+  setResponseWS ws = do
+    -- First check the body situation.
+    body <- getActionField aeBody
+
+    case body of
+      BodyUnparsed -> do
+        frameLimit   <- WS.SizeLimit <$> getActionField aeFrameLimit
+        messageLimit <- WS.SizeLimit <$> getActionField aeMsgLimit
+
+        let opts = WS.defaultConnectionOptions
+                     { WS.connectionFramePayloadSizeLimit = frameLimit
+                     , WS.connectionMessageDataSizeLimit  = messageLimit
+                     }
+
+        req <- getRequest
+
+        setActionField aeBody BodyWebSocket
+        setActionField aeRespMaker \_st _hs ->
+          case websocketsApp opts app req of
+            Nothing   -> responseLBS status400 [] "WebSocket Expected"
+            Just resp -> resp
+
+      _else -> do
+        throwError InternalError "Body has already been consumed."
+
+    where
+      app :: WS.PendingConnection -> IO ()
+      app pc = do
+        void do
+          conn <- WS.acceptRequest pc
+          WS.withPingThread conn 30 (return ()) do
+            runReaderT (unWebSocket ws) conn
+
+
+  -- |
+  -- WebSocket context.
+  --
+  newtype WebSocket a
+    = WebSocket
+      { unWebSocket    :: ReaderT WS.Connection IO a
+      }
+    deriving (MonadUnliftIO, MonadIO, Monad, Applicative, Functor)
+
+
+  -- |
+  -- Send a textual message.
+  --
+  wsSendText :: (WS.WebSocketsData a) => a -> WebSocket ()
+  wsSendText payload = do
+    conn <- wsGetConn
+    liftIO $ WS.sendTextData conn payload
+
+
+  -- |
+  -- Send a binary message.
+  --
+  wsSendBinary :: (WS.WebSocketsData a) => a -> WebSocket ()
+  wsSendBinary payload = do
+    conn <- wsGetConn
+    liftIO $ WS.sendBinaryData conn payload
+
+
+  -- |
+  -- Receive a message decoded as either binary or text,
+  -- depending on the requested value type.
+  --
+  wsReceive :: (WS.WebSocketsData a) => WebSocket a
+  wsReceive = do
+    conn <- wsGetConn
+    liftIO $ WS.receiveData conn
+
+
+  -- |
+  -- Get the WebSocket connection.
+  --
+  wsGetConn :: WebSocket WS.Connection
+  wsGetConn = WebSocket ask
+
+
+  -- Errors ------------------------------------------------------------------
 
 
   -- |
