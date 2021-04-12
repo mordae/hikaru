@@ -66,7 +66,7 @@ module Hikaru.Localize
 where
   import Relude
 
-  import Data.List
+  import Data.List (nub)
   import Data.String.Conversions
   import Hikaru.Action
   import Hikaru.Media

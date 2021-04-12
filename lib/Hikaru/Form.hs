@@ -99,7 +99,7 @@ where
   import Relude hiding (Option, show, elem)
 
   import Data.Dynamic
-  import Data.List
+  import Data.List (elem, lookup)
   import Data.Text (strip)
   import Hikaru.Action
   import Hikaru.CSRF
@@ -608,7 +608,7 @@ where
               -> ControlT 'InputFieldTag l o v m a
               -> FormT l o m v
   hiddenValue name generate body = FormT do
-    env@Env{..} <- ask
+    env <- ask
     (val, text) <- getParamOrig name generate
 
     new <- lift $ lift do
@@ -689,7 +689,7 @@ where
   -- |
   -- TODO
   --
-  select :: (Monad m, FromFormMessage l, Param v, Selectable v)
+  select :: (Monad m, FromFormMessage l, Selectable v)
          => Text
          -> (o -> v)
          -> ControlT 'SelectFieldTag l o v m a
@@ -717,7 +717,7 @@ where
   --
   -- TODO: Add an example.
   --
-  options :: (Monad m, Param v, Selectable v)
+  options :: (Monad m, Selectable v)
           => [Option l] -> ControlT 'SelectFieldTag l o v m ()
   options opts = ControlT do
     modify \s@ControlState{..} ->
@@ -800,7 +800,7 @@ where
   -- Debugging ---------------------------------------------------------------
 
 
-  dumpForm :: (MonadIO m, Show l, Show o) => FormT l o m ()
+  dumpForm :: (MonadIO m, Show o) => FormT l o m ()
   dumpForm = FormT do
     env <- ask
 
@@ -811,7 +811,7 @@ where
     return $ Just ()
 
 
-  dumpControl :: (MonadIO m, Show l, Show o, Show v) => ControlT t l o v m ()
+  dumpControl :: (MonadIO m, Show l, Show v) => ControlT t l o v m ()
   dumpControl = ControlT do
     ctrst <- get
 
@@ -838,7 +838,7 @@ where
          in return (fromParam =<< param, fromMaybe "" param)
 
 
-  getSelectParams :: (Monad m, Param v, Selectable v)
+  getSelectParams :: (Monad m, Selectable v)
                   => Text -> ReaderT (Env o) m (Maybe v)
   getSelectParams name = do
     Env{..} <- ask

@@ -1,122 +1,112 @@
-cabal-version: 1.12
+cabal-version:      3.0
+name:               hikaru
+version:            0.1.0.0
+license:            AGPL-3.0-or-later
+license-file:       LICENSE.md
+copyright:          Jan Hamal Dvořák
+maintainer:         mordae@anilinux.org
+author:             Jan Hamal Dvořák
+homepage:           https://github.com/mordae/hikaru#readme
+bug-reports:        https://github.com/mordae/hikaru/issues
+synopsis:           Haskell web micro framework
+description:
+    Hikaru is a micro framework for web applications.
+    It provides applicative routing, content negotiation
+    and a customizable action monad.
+    .
+    (It is also a Star Trek reference, which is apparently
+    a requirement for this class of software.)
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
---
--- see: https://github.com/sol/hpack
---
--- hash: 3bf5d3e31633e3ccf1a02683302849a23a53f7b621bf6e24759bdca47151b60a
-
-name:           hikaru
-version:        0.1.0.0
-synopsis:       Haskell web micro framework
-description:    Hikaru is a micro framework for web applications.
-                It provides applicative routing, content negotiation
-                and a customizable action monad.
-                .
-                (It is also a Star Trek reference, which is apparently
-                a requirement for this class of software.)
-category:       Web
-homepage:       https://github.com/mordae/hikaru#readme
-bug-reports:    https://github.com/mordae/hikaru/issues
-author:         Jan Hamal Dvořák
-maintainer:     mordae@anilinux.org
-copyright:      Jan Hamal Dvořák
-license:        AGPL-3
-license-file:   LICENSE.md
-build-type:     Simple
-extra-source-files:
-    README.md
+category:           Web
+build-type:         Simple
+extra-source-files: README.md
 
 source-repository head
-  type: git
-  location: https://github.com/mordae/hikaru
+    type:     git
+    location: https://github.com/mordae/hikaru
 
 library
-  exposed-modules:
-      Hikaru
-      Hikaru.Action
-      Hikaru.Config
-      Hikaru.CSRF
-      Hikaru.Dispatch
-      Hikaru.Form
-      Hikaru.Link
-      Hikaru.Localize
-      Hikaru.Media
-      Hikaru.Route
-      Hikaru.Types
-  other-modules:
-      Hikaru.Develop
-      Paths_hikaru
-  hs-source-dirs:
-      lib
-  default-extensions: BlockArguments DataKinds DefaultSignatures DeriveGeneric FlexibleContexts FlexibleInstances GADTs GeneralizedNewtypeDeriving KindSignatures LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving UndecidableInstances
-  ghc-options: -Wall -Wcompat
-  build-depends:
-      aeson >=1.4 && <1.5
-    , base >=4.13 && <4.14
-    , binary >=0.8 && <0.9
-    , bytestring >=0.10 && <0.11
-    , case-insensitive >=1.2 && <1.3
-    , containers >=0.6 && <0.7
-    , cookie >=0.4 && <0.5
-    , cryptonite >=0.26 && <0.27
-    , foreign-store >=0.2 && <0.3
-    , http-types >=0.12 && <0.13
-    , lucid >=2.9 && <2.10
-    , memory >=0.15 && <0.16
-    , mtl >=2.2 && <2.3
-    , relude >=0.7 && <0.8
-    , resourcet >=1.2 && <1.3
-    , string-conversions >=0.4 && <0.5
-    , text >=1.2 && <1.3
-    , text-icu >=0.7 && <0.8
-    , time >=1.9 && <1.10
-    , wai >=3.2 && <3.3
-    , wai-extra >=3.0 && <3.1
-    , wai-websockets >=3.0 && <3.1
-    , websockets >=0.12 && <0.13
-  default-language: Haskell2010
+    exposed-modules:
+        Hikaru
+        Hikaru.Action
+        Hikaru.Config
+        Hikaru.CSRF
+        Hikaru.Dispatch
+        Hikaru.Form
+        Hikaru.Link
+        Hikaru.Localize
+        Hikaru.Media
+        Hikaru.Route
+        Hikaru.Types
+
+    hs-source-dirs:     lib
+    other-modules:
+        Hikaru.Develop
+        Paths_hikaru
+
+    default-extensions:
+        BlockArguments DataKinds DefaultSignatures DeriveGeneric
+        FlexibleContexts FlexibleInstances GADTs GeneralizedNewtypeDeriving
+        KindSignatures LambdaCase MultiParamTypeClasses NamedFieldPuns
+        NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards
+        ScopedTypeVariables StandaloneDeriving UndecidableInstances
+        EmptyDataDecls ImportQualifiedPost
+
+    ghc-options:
+        -Wall -Wcompat -Wincomplete-uni-patterns
+        -Wincomplete-record-updates -Widentities -Wredundant-constraints
+
+    build-depends:
+        aeson >=1.4 && <=1.6,
+        base >=4.13 && <=4.16,
+        binary >=0.8 && <=0.9,
+        bytestring >=0.10 && <=0.12,
+        case-insensitive >=1.2 && <=1.3,
+        containers >=0.6 && <=0.7,
+        cookie >=0.4 && <=0.5,
+        cryptonite >=0.26 && <=0.29,
+        foreign-store >=0.2 && <=0.3,
+        http-types >=0.12 && <=0.13,
+        lucid >=2.9 && <=2.10,
+        memory >=0.15 && <=0.16,
+        mtl >=2.2 && <=2.3,
+        relude >=0.7 && <=1.1,
+        resourcet >=1.2 && <=1.3,
+        string-conversions >=0.4 && <=0.5,
+        text >=1.2 && <=1.3,
+        text-icu >=0.7 && <=0.8,
+        time >=1.9 && <=1.12,
+        wai >=3.2 && <=3.3,
+        wai-extra >=3.0 && <=3.2,
+        wai-websockets >=3.0 && <=3.1,
+        websockets >=0.12 && <=0.13
 
 test-suite spec
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-      Hikaru.Demo
-      Hikaru.DemoSpec
-      Hikaru.FormSpec
-      Hikaru.Test
-      Paths_hikaru
-  hs-source-dirs:
-      test
-  default-extensions: BlockArguments DataKinds DefaultSignatures DeriveGeneric FlexibleContexts FlexibleInstances GADTs GeneralizedNewtypeDeriving KindSignatures LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving UndecidableInstances
-  ghc-options: -Wall -Wcompat -threaded -rtsopts -with-rtsopts=-N
-  cpp-options: -DTEST
-  build-tool-depends:
-      hspec-discover:hspec-discover
-  build-depends:
-      aeson >=1.4 && <1.5
-    , base >=4.13 && <4.14
-    , binary >=0.8 && <0.9
-    , bytestring >=0.10 && <0.11
-    , case-insensitive >=1.2 && <1.3
-    , containers >=0.6 && <0.7
-    , cookie >=0.4 && <0.5
-    , cryptonite >=0.26 && <0.27
-    , foreign-store >=0.2 && <0.3
-    , hikaru
-    , hspec
-    , http-types >=0.12 && <0.13
-    , lucid >=2.9 && <2.10
-    , memory >=0.15 && <0.16
-    , mtl >=2.2 && <2.3
-    , relude >=0.7 && <0.8
-    , resourcet >=1.2 && <1.3
-    , string-conversions >=0.4 && <0.5
-    , text >=1.2 && <1.3
-    , text-icu >=0.7 && <0.8
-    , time >=1.9 && <1.10
-    , wai >=3.2 && <3.3
-    , wai-extra >=3.0 && <3.1
-    , wai-websockets >=3.0 && <3.1
-    , websockets >=0.12 && <0.13
-  default-language: Haskell2010
+    type:               exitcode-stdio-1.0
+    main-is:            Spec.hs
+    build-tool-depends: hspec-discover:hspec-discover -any
+    cpp-options:        -DTEST
+    hs-source-dirs:     test
+    other-modules:
+        Hikaru.Demo
+        Hikaru.DemoSpec
+        Hikaru.FormSpec
+        Hikaru.Test
+        Paths_hikaru
+
+    default-extensions:
+        BlockArguments DataKinds DefaultSignatures DeriveGeneric
+        FlexibleContexts FlexibleInstances GADTs GeneralizedNewtypeDeriving
+        KindSignatures LambdaCase MultiParamTypeClasses NamedFieldPuns
+        NoImplicitPrelude OverloadedStrings RankNTypes RecordWildCards
+        ScopedTypeVariables StandaloneDeriving UndecidableInstances
+        EmptyDataDecls ImportQualifiedPost
+
+    ghc-options:
+        -Wall -Wcompat -Wincomplete-uni-patterns
+        -Wincomplete-record-updates -Widentities -Wredundant-constraints
+        -threaded -rtsopts -with-rtsopts=-N
+
+    build-depends:
+        hikaru -any,
+        hspec -any

@@ -126,7 +126,7 @@ where
   import Data.Aeson (Value, ToJSON, encode, eitherDecode')
   import Data.Binary.Builder
   import Data.Dynamic
-  import Data.List
+  import Data.List (lookup, deleteBy)
   import Data.String.Conversions
   import Hikaru.Config
   import Hikaru.Media

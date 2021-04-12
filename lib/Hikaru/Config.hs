@@ -34,7 +34,7 @@ module Hikaru.Config
   , generateSecret
   )
 where
-  import Relude hiding (drop, lines, isPrefixOf, length)
+  import Relude hiding (drop, lines, isPrefixOf, length, span)
 
   import qualified Data.Map as Map
 
