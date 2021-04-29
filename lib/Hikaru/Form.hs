@@ -683,7 +683,10 @@ where
   placeholder :: (Monad m) => l -> ControlT 'InputFieldTag l o v m ()
   placeholder ph = ControlT do
     modify \s@ControlState{..} ->
-      s { csField = csField { fieldPlacehold = Just ph } }
+      s { csField = case csField of
+                      InputField{..} -> InputField{fieldPlacehold = Just ph, ..}
+                      SelectField{} -> error "BUG: Unreachable"
+        }
 
 
   -- |
@@ -724,7 +727,10 @@ where
       let opts' = case csValue of
                     Nothing  -> opts
                     Just val -> selectOptions val opts
-       in s { csField = csField { fieldOptions = opts' } }
+       in s { csField = case csField of
+                          SelectField{} -> SelectField{fieldOptions = opts', ..}
+                          InputField{} -> error "BUG: Unreachable"
+            }
 
 
   -- |
@@ -793,7 +799,9 @@ where
 
     modify \s@ControlState{csField} ->
       s { csValue = value'
-        , csField = csField { fieldValue = maybe "" toParam value' }
+        , csField = case csField of
+                      InputField{..} -> InputField{fieldValue = maybe "" toParam value', ..}
+                      SelectField{} -> error "BUG: Unreachable"
         }
 
 
