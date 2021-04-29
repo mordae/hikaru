@@ -243,7 +243,7 @@ where
             _otherwise    -> label_ $ lc_ elemLabel
 
         div_ do
-          forM_ elemControls \ctrl@Control{..} -> do
+          forM_ elemControls \ctrl@Control{} -> do
             viewControl_ ctrl
 
           forM_ elemControls \Control{..} -> do
