@@ -37,6 +37,7 @@ common common
         DataKinds
         DefaultSignatures
         DeriveGeneric
+        DuplicateRecordFields
         EmptyDataDecls
         FlexibleContexts
         FlexibleInstances
@@ -53,6 +54,8 @@ common common
         RecordWildCards
         ScopedTypeVariables
         StandaloneDeriving
+        TupleSections
+        TypeApplications
         UndecidableInstances
 
     ghc-options:
@@ -98,6 +101,7 @@ library
         Hikaru.Config
         Hikaru.CSRF
         Hikaru.Dispatch
+        Hikaru.Widget
         Hikaru.Form
         Hikaru.Link
         Hikaru.Localize
