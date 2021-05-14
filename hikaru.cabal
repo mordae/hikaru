@@ -97,6 +97,7 @@ library
 
     exposed-modules:
         Hikaru
+        Hikaru.Develop
         Hikaru.Action
         Hikaru.Config
         Hikaru.CSRF
@@ -111,7 +112,6 @@ library
 
     hs-source-dirs: lib
     other-modules:
-        Hikaru.Develop
         Paths_hikaru
 
 test-suite spec
