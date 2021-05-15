@@ -1,6 +1,6 @@
 # Hikaru
 
-**Hikaru is a micro framework for web applications. It provides applicative routing, content negotiation and a customizable action monad.**
+**Hikaru is a small framework for web applications. It provides applicative routing, content negotiation and a customizable action monad.**
 
 (It is also a Star Trek reference, which is apparently a requirement for this class of software.)
 

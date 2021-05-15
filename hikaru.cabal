@@ -11,9 +11,9 @@ copyright: Jan Hamal Dvořák
 maintainer: mordae@anilinux.org
 author: Jan Hamal Dvořák
 
-synopsis: Haskell web micro framework
+synopsis: Haskell web application framework
 description:
-    Hikaru is a micro framework for web applications.
+    Hikaru is a small framework for web applications.
     It provides applicative routing, content negotiation
     and a customizable action monad.
     .
