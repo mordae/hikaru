@@ -312,7 +312,7 @@ where
 
     where
       response st = resp . responseLBS st [(hContentType, "text/plain")]
-                         . cs . (<> "\n" <> msg)
+                         . cs . (\str -> if msg == "" then str else msg)
 
 
   -- |
