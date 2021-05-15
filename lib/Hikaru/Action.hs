@@ -123,7 +123,7 @@ where
 
   import Control.Exception (throwIO, bracket_)
   import Control.Monad.Trans.Resource
-  import Data.Aeson (Value, ToJSON, encode, eitherDecode')
+  import Data.Aeson
   import Data.Binary.Builder
   import Data.Dynamic
   import Data.List (lookup, deleteBy)
@@ -602,14 +602,17 @@ where
   -- * Throws 'InternalError' is the body has already been consumed
   --   and was not cached as JSON.
   --
-  getJSON :: (MonadAction m) => m Value
+  getJSON :: (MonadAction m, FromJSON a) => m a
   getJSON = do
     -- First check out our stash.
     cache <- getActionField aeBody
 
     case cache of
       -- This is ideal, we already have what we need.
-      BodyJSON value -> return value
+      BodyJSON value ->
+        case fromJSON value of
+          Data.Aeson.Error err -> throwError BadRequest (cs err)
+          Data.Aeson.Success out -> return out
 
       -- Body has not been parsed yet. This is very good.
       BodyUnparsed -> do
@@ -630,7 +633,11 @@ where
 
         -- Cache and return.
         setActionField aeBody (BodyJSON value)
-        return value
+
+        -- Parse to the output type.
+        case fromJSON value of
+          Data.Aeson.Error err -> throwError BadRequest (cs err)
+          Data.Aeson.Success out -> return out
 
       -- Now this is bad. We have already read the body,
       -- but not as a JSON. This is an internal error.
@@ -927,9 +934,9 @@ where
   -- body to the result of encoding provided Aeson value.
   --
   sendJSON :: (MonadAction m, ToJSON a) => a -> m ()
-  sendJSON json = do
+  sendJSON payload = do
     defaultHeader hContentType "application/json"
-    setResponseBS (encode json)
+    setResponseBS (encode payload)
 
 
   -- |
