@@ -17,6 +17,7 @@ module Hikaru.Media
 
     -- * Parsing
   , parseMedia
+  , pMediaList
 
     -- * Matching
   , matchMedia
@@ -24,11 +25,13 @@ module Hikaru.Media
   , selectMedia
   )
 where
-  import Relude hiding (group, find, head)
+  import Relude hiding (head, get, many)
   import Relude.Unsafe (head)
-
+  import Text.ParserCombinators.ReadP
   import Data.String.Conversions
-  import Data.Text.ICU
+  import Data.Text (toLower)
+  import Data.List (lookup)
+  import Data.Char (isControl, isSpace)
 
 
   -- |
@@ -41,6 +44,7 @@ where
     = Media
       { mediaMainType  :: Text
       , mediaSubType   :: Text
+      , mediaParams    :: [(Text, Text)]
       , mediaQuality   :: Float
       }
     deriving (Show, Eq, Ord)
@@ -65,19 +69,48 @@ where
   -- ]
   --
   parseMedia :: Text -> [Media]
-  parseMedia = sortWith (negate . mediaQuality)
-             . mapMaybe build
-             . mapMaybe (group 0)
-             . findAll reMedia
-    where
-      build :: Text -> Maybe Media
-      build t = do
-        match <- find reParts t
-        main  <- group 1 match
-        sub   <- group 2 match
-        q     <- (readMaybe =<< cs <$> group 3 match) <|> Just 1.0
+  parseMedia text = case readP_to_S pMediaList (cs (toLower text)) of
+                      (m, ""):_ -> sortWith (negate . mediaQuality) m
+                      _else     -> []
 
-        return $ Media main sub q
+
+  -- |
+  -- Parser for the media list coded mostly to the RFC 2045.
+  -- Input is always lowercased and unicode is accepted.
+  --
+  pMediaList :: ReadP [Media]
+  pMediaList = sepBy pMedia pSeparator <* eof
+    where
+      pMedia = do
+        mediaMainType <- cs <$> pToken
+        _             <- char '/'
+        mediaSubType  <- cs <$> pToken
+        mediaParams   <- many pParameter
+
+        let mediaQuality = fromMaybe 1.0 do
+                             q <- lookup "q" mediaParams
+                             readMaybe (cs q)
+
+        return Media{..}
+
+      pParameter = do
+        _     <- pSpaced $ char ';'
+        name  <- cs <$> pToken
+        _     <- pSpaced $ char '='
+        value <- cs <$> pValue
+        return (name, value)
+
+      pSeparator = pSpaced $ char ','
+      pToken     = pSpaced $ many1 (satisfy (not . quote))
+      pValue     = pToken <++ pQuotedStr
+      pQuotedStr = pSpaced $ pQuoted $ many (pExcept '\\')
+
+      pExcept c  = satisfy (c /=)
+      pSpaced p  = skipSpaces *> p <* skipSpaces
+      pQuoted p  = char '"' *> p <* char '"'
+
+      quote c    = isControl c || isSpace c || c `elem` specials
+      specials   = "()<>@,;:\\\"/[]?=" :: [Char]
 
 
   -- |
@@ -133,20 +166,6 @@ where
       best = sortWith (negate . mediaQuality . snd) good
       good = filter (uncurry matchMedia) prod
       prod = [(l, r) | l <- ls, r <- rs]
-
-
-  -- |
-  -- Used to split text into individual media elements.
-  --
-  reMedia :: Regex
-  reMedia = "(?:[^,]|\"(?:[^\"]|\\\")*\")+"
-
-
-  -- |
-  -- Used to split media element into its individual components.
-  --
-  reParts :: Regex
-  reParts = "([[:alnum:]!#$%&'*+.^_`|~-]+)(?:\\s*/\\s*([[:alnum:]!#$%&'*+.^_`|~-]+))?(?:.*;q\\s*=\\s*([0-9.]+))?"
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
