@@ -15,7 +15,7 @@ where
   import Relude hiding (for_, Option, get)
 
   import Control.Concurrent.MVar (modifyMVar_)
-  import Data.Aeson ()
+  import Data.Aeson (Value)
   import Hikaru
   import Lucid
   import Network.HTTP.Types.Header
@@ -165,7 +165,9 @@ where
 
 
   postEchoR :: Action ()
-  postEchoR = sendJSON =<< getJSON
+  postEchoR = do
+    (json :: Value) <- getJSON
+    sendJSON json
 
 
   getHelloR :: Text -> Action ()
