@@ -27,6 +27,7 @@ module Hikaru.Config
   , configDefault
 
   -- * Reading Config
+  , configGet
   , configGetMaybe
   , configGetDefault
 
@@ -105,6 +106,16 @@ where
     return $ Map.fromList [ ("CSRF_SECRET",   secret)
                           , ("CSRF_VALIDITY", "86400")
                           ]
+
+
+  -- |
+  -- Obtain value of a configuration key or raise an error.
+  -- You really should not use this function, you know?
+  --
+  configGet :: (Param a) => Text -> Config -> a
+  configGet name cfg = case configGetMaybe name cfg of
+                         Just value -> value
+                         Nothing -> error (name <> " not set!")
 
 
   -- |
