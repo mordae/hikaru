@@ -36,15 +36,14 @@ module Hikaru.Config
   )
 where
   import Relude hiding (drop, lines, isPrefixOf, length, span)
-
-  import qualified Data.Map as Map
-
+  import UnliftIO.Environment
   import Crypto.Random.Entropy
   import Data.ByteArray.Encoding
   import Data.String.Conversions
   import Data.Text hiding (map)
   import Hikaru.Types
-  import System.Environment
+
+  import qualified Data.Map as Map
 
 
   -- |
@@ -57,7 +56,7 @@ where
   -- Read configuration from program environment.
   --
   configFromEnv :: (MonadIO m) => m Config
-  configFromEnv = Map.fromList <$> map conv <$> liftIO getEnvironment
+  configFromEnv = Map.fromList <$> map conv <$> getEnvironment
     where conv (k, v) = (cs k, cs v)
 
 

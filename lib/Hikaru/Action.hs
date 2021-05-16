@@ -113,7 +113,7 @@ module Hikaru.Action
   , FilePath
   )
 where
-  import Relude
+  import Relude hiding (writeIORef, readIORef, modifyIORef', newIORef)
 
   import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
@@ -121,8 +121,8 @@ where
   import qualified Data.Text.Lazy as LT
   import qualified Network.Wai.Parse as Parse
 
-  import Control.Exception (throwIO, bracket_)
   import Control.Monad.Trans.Resource
+  import UnliftIO
   import Data.Aeson
   import Data.Binary.Builder
   import Data.Dynamic
@@ -177,7 +177,7 @@ where
   getActionField :: (MonadAction m) => (ActionEnv -> IORef a) -> m a
   getActionField field = do
     ref <- field <$> getActionEnv
-    liftIO $ readIORef ref
+    readIORef ref
 
 
   -- |
@@ -186,7 +186,7 @@ where
   setActionField :: (MonadAction m) => (ActionEnv -> IORef a) -> a -> m ()
   setActionField field value = do
     ref <- field <$> getActionEnv
-    liftIO $ writeIORef ref value
+    writeIORef ref value
 
 
   -- |
@@ -196,7 +196,7 @@ where
                     => (ActionEnv -> IORef a) -> (a -> a) -> m ()
   modifyActionField field fn = do
     ref <- field <$> getActionEnv
-    liftIO $ modifyIORef' ref fn
+    modifyIORef' ref fn
 
 
   -- |
@@ -1166,7 +1166,7 @@ where
   -- Same an IO exception in the form of ('RequestError', 'Text').
   --
   throwError :: (MonadAction m) => RequestError -> Text -> m a
-  throwError exn msg = liftIO $ throwIO (exn, msg)
+  throwError exn msg = throwIO (exn, msg)
 
 
   -- Localization ------------------------------------------------------------
