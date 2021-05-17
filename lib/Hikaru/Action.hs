@@ -1,7 +1,7 @@
 {-|
 Module      :  Hikaru.Action
 Copyright   :  Jan Hamal Dvořák
-License     :  AGPL-3
+License     :  AGPL-3.0-or-later
 
 Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
