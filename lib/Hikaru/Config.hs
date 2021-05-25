@@ -1,24 +1,23 @@
-{-|
-Module      :  Hikaru.Config
-Copyright   :  Jan Hamal Dvořák
-License     :  AGPL-3.0-or-later
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides means to read configuration from environment and files.
-
-Example:
-
-@
-base <- 'configDefault'
-file <- 'configFromFile' \"site.env\"
-env  <- 'configFromEnv'
-
-let cfg = env <> file <> base
-@
--}
+--
+-- Module      :  Hikaru.Config
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  AGPL-3.0-or-later
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides means to read configuration from environment and files.
+--
+-- Example:
+--
+-- @
+-- base <- 'configDefault'
+-- file <- 'configFromFile' \"site.env\"
+-- env  <- 'configFromEnv'
+--
+-- let cfg = env <> file <> base
+-- @
 
 module Hikaru.Config
   ( Config
@@ -35,13 +34,17 @@ module Hikaru.Config
   , generateSecret
   )
 where
-  import Relude hiding (drop, lines, isPrefixOf, length, span)
+  import Praha
+
+  import Hikaru.Types
+
   import UnliftIO.Environment
   import Crypto.Random.Entropy
   import Data.ByteArray.Encoding
-  import Data.String.Conversions
-  import Data.Text hiding (map)
-  import Hikaru.Types
+
+  import Data.Text (lines, strip, drop, span, isPrefixOf)
+  import Data.Text.IO (readFile)
+  import Data.List (map)
 
   import qualified Data.Map as Map
 
@@ -84,8 +87,9 @@ where
   -- @
   --
   configFromFile :: (MonadIO m) => FilePath -> m Config
-  configFromFile path = Map.fromList <$> parseFile <$> readFileText path
+  configFromFile path = Map.fromList <$> parseFile <$> contents
     where
+      contents    = liftIO (readFile path)
       parseFile   = mapMaybe parseLine . lines
       parseLine   = fmap tidy . fmap parseKV . reject . strip
       parseKV     = fmap (drop 1) . span (/= '=')
@@ -114,7 +118,7 @@ where
   configGet :: (Param a) => Text -> Config -> a
   configGet name cfg = case configGetMaybe name cfg of
                          Just value -> value
-                         Nothing -> error (name <> " not set!")
+                         Nothing -> error (cs name <> " not set!")
 
 
   -- |

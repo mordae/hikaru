@@ -12,7 +12,7 @@ module Hikaru.FormSpec
   ( spec
   )
 where
-  import Relude
+  import Praha
 
   import Hikaru ()
   import Hikaru.Test

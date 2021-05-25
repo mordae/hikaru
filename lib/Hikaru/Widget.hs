@@ -63,9 +63,9 @@ module Hikaru.Widget
   , Render(..)
   )
 where
-  import Relude
+  import Praha
   import Data.Text (stripPrefix)
-  import Data.List (lookup)
+  import Data.List (lookup, filter)
   import Lucid
   import Hikaru.Types
   import Hikaru.Action

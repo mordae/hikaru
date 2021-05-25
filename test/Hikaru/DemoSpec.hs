@@ -14,7 +14,7 @@ module Hikaru.DemoSpec
   ( spec
   )
 where
-  import Relude hiding (get)
+  import Praha
 
   import Hikaru.Demo
   import Hikaru.Test

@@ -12,15 +12,16 @@ module Hikaru.Demo
   ( makeDemo
   )
 where
-  import Relude hiding (for_, Option, get)
+  import Praha hiding (for_)
 
-  import Control.Concurrent.MVar (modifyMVar_)
+  import UnliftIO.MVar
   import Data.Aeson (Value)
   import Hikaru
   import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import Network.Wai
+  import Data.Text (unlines)
 
 
   -- Action ------------------------------------------------------------------
@@ -72,7 +73,7 @@ where
   countVisitor = do
     counter <- modelCounter <$> getModelEnv
     liftIO do
-      modifyMVar_ counter (return . succ)
+      modifyMVar_ counter (return . (+ 1))
       readMVar counter
 
 
@@ -150,7 +151,7 @@ where
     -- Present fancy HTML result.
     sendHTML do
       h1_ "Welcome!"
-      p_ $ "You are " >> toHtml (show n :: Text) >> ". visitor!"
+      p_ $ "You are " >> toHtml (tshow n) >> ". visitor!"
 
 
   getRootTextR :: Action ()
@@ -160,7 +161,7 @@ where
 
     -- Present a plain textual result.
     sendText $ unlines [ "Welcome!"
-                       , "You are " <> show n <> ". visitor!"
+                       , "You are " <> tshow n <> ". visitor!"
                        ]
 
 
@@ -219,11 +220,11 @@ where
 
         forM cases \Case{..} -> do
           tr_ do
-            td_ $ toHtml $ (show caseId :: Text)
+            td_ $ toHtml $ tshow caseId
             td_ $ toHtml $ caseName
             td_ $ toHtml $ caseRecNo
-            td_ $ toHtml $ (show caseMode :: Text)
-            td_ $ toHtml $ (show caseActive :: Text)
+            td_ $ toHtml $ tshow caseMode
+            td_ $ toHtml $ tshow caseActive
 
 
   -- Forms -------------------------------------------------------------------

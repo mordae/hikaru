@@ -21,7 +21,7 @@ module Hikaru.Test
   , module Test.Hspec
   )
 where
-  import Relude hiding (get)
+  import Praha
 
   import qualified Data.ByteString.Lazy as LBS
 

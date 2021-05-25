@@ -113,7 +113,7 @@ module Hikaru.Action
   , FilePath
   )
 where
-  import Relude hiding (writeIORef, readIORef, modifyIORef', newIORef)
+  import Praha
 
   import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
@@ -126,8 +126,7 @@ where
   import Data.Aeson
   import Data.Binary.Builder
   import Data.Dynamic
-  import Data.List (lookup, deleteBy)
-  import Data.String.Conversions
+  import Data.List (deleteBy, lookup, map, filter)
   import Hikaru.Config
   import Hikaru.Media
   import Hikaru.Types
@@ -556,7 +555,7 @@ where
     where
       throwLimitIO :: Int64 -> IO a
       throwLimitIO n = throwIO (PayloadTooLarge, msg :: Text)
-        where msg = "Limit is " <> show n <> " bytes."
+        where msg = "Limit is " <> tshow n <> " bytes."
 
 
   -- |

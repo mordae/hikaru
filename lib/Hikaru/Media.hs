@@ -25,12 +25,12 @@ module Hikaru.Media
   , selectMedia
   )
 where
-  import Relude hiding (head, get, many)
-  import Relude.Unsafe (head)
-  import Text.ParserCombinators.ReadP
-  import Data.String.Conversions
+  import Praha hiding (many)
+
   import Data.Text (toLower)
-  import Data.List (lookup)
+
+  import Data.List (filter, lookup, head, sortOn)
+  import Text.ParserCombinators.ReadP
   import Data.Char (isControl, isSpace)
 
 
@@ -70,7 +70,7 @@ where
   --
   parseMedia :: Text -> [Media]
   parseMedia text = case readP_to_S pMediaList (cs (toLower text)) of
-                      (m, ""):_ -> sortWith (negate . mediaQuality) m
+                      (m, ""):_ -> sortOn (negate . mediaQuality) m
                       _else     -> []
 
 
@@ -163,7 +163,7 @@ where
                         [ ]      -> Nothing
                         (l, r):_ -> Just $ l { mediaQuality = mediaQuality r }
     where
-      best = sortWith (negate . mediaQuality . snd) good
+      best = sortOn (negate . mediaQuality . snd) good
       good = filter (uncurry matchMedia) prod
       prod = [(l, r) | l <- ls, r <- rs]
 

@@ -25,13 +25,13 @@ module Hikaru.Link
   , isActivePrefix
   )
 where
-  import Relude
+  import Praha
 
   import Data.Binary.Builder
-  import Data.String.Conversions
   import Lucid
   import Network.HTTP.Types.URI
   import Hikaru.Action
+  import Data.List (isPrefixOf, map, filter)
 
 
   -- |

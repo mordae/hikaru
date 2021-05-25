@@ -14,7 +14,9 @@ module Hikaru.Develop
   ( developWith
   )
 where
-  import Relude
+  import Praha
+
+  import UnliftIO.MVar
 
   import Control.Concurrent (killThread, forkFinally)
   import Foreign.Store

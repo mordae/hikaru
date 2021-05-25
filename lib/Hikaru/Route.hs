@@ -59,10 +59,9 @@ module Hikaru.Route
   , Route
   )
 where
-  import Relude hiding (get, put, head)
+  import Praha
 
-  import Data.List (lookup)
-  import Data.String.Conversions
+  import Data.List (lookup, map)
   import Hikaru.Media
   import Hikaru.Types
   import Network.HTTP.Types.Header

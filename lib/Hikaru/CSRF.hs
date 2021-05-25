@@ -15,11 +15,10 @@ module Hikaru.CSRF
   , isTokenValid
   )
 where
-  import Relude
+  import Praha
 
   import Crypto.Hash
   import Crypto.MAC.HMAC
-  import Data.String.Conversions
   import Data.Text (splitOn)
   import Data.Time.Clock.POSIX (getPOSIXTime)
 
@@ -37,7 +36,7 @@ where
     secret <- getConfigDefault "CSRF_SECRET" ""
 
     let signature = sign now secret
-     in return $ mconcat [ show now, ":", signature ]
+     in return $ mconcat [ tshow now, ":", signature ]
 
 
   -- |
@@ -73,11 +72,11 @@ where
 
 
   sign :: Int64 -> Text -> Text
-  sign timestamp secret = show $ hmacGetDigest digest
+  sign timestamp secret = tshow $ hmacGetDigest digest
     where
       digest      = hmac timeBytes secretBytes :: HMAC SHA256
       secretBytes = cs secret :: ByteString
-      timeBytes   = show timestamp :: ByteString
+      timeBytes   = cs (show timestamp) :: ByteString
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

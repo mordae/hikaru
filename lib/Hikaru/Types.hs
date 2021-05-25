@@ -17,10 +17,9 @@ module Hikaru.Types
   , defaultHandler
   )
 where
-  import Relude
+  import Praha
 
   import Data.ByteString (ByteString)
-  import Data.String.Conversions
   import Data.Text (pack, unpack)
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status

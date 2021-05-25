@@ -64,10 +64,9 @@ module Hikaru.Localize
   , selectLanguages
   )
 where
-  import Relude
+  import Praha
 
-  import Data.List (nub)
-  import Data.String.Conversions
+  import Data.List (filter, map, nub)
   import Hikaru.Action
   import Hikaru.Media
   import Lucid
@@ -129,7 +128,7 @@ where
     langs <- getLanguages
 
     case mapMaybe (flip localize msg) langs of
-      []  -> return $ show msg
+      []  -> return $ tshow msg
       x:_ -> return x
 
 
@@ -142,7 +141,7 @@ where
     langs <- getLanguages
 
     case mapMaybe (flip localizeHtml msg) langs of
-      []  -> toHtml $ (show msg :: Text)
+      []  -> toHtml $ tshow msg
       x:_ -> x
 
 
