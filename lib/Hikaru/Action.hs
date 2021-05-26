@@ -20,6 +20,7 @@ module Hikaru.Action
   , getHeaders
   , getHeaderMaybe
   , getHeaderDefault
+  , getBasicAuth
   , getAccept
   , getAcceptCharset
   , getAcceptEncoding
@@ -118,9 +119,11 @@ where
   import qualified Network.Wai.Parse as Parse
 
   import Control.Monad.Trans.Resource
-  import UnliftIO
   import Data.Aeson
   import Data.Binary.Builder
+  import Data.ByteArray.Encoding
+  import Data.ByteString.Char8 (words, span, drop)
+  import Data.CaseInsensitive (mk)
   import Data.Dynamic
   import Data.List (deleteBy, lookup, map, filter)
   import Hikaru.Media
@@ -132,6 +135,7 @@ where
   import Network.Wai
   import Network.Wai.Handler.WebSockets
   import System.IO.Unsafe
+  import UnliftIO
   import Web.Cookie
 
   import qualified Network.WebSockets as WS
@@ -227,11 +231,11 @@ where
     bracket_ (return ()) (finalize env) do
       _   <- run env
 
-      st  <- readIORef $ aeRespStatus  $ env
-      hs  <- readIORef $ aeRespHeaders $ env
-      mk  <- readIORef $ aeRespMaker   $ env
+      status  <- readIORef $ aeRespStatus  $ env
+      headers <- readIORef $ aeRespHeaders $ env
+      make    <- readIORef $ aeRespMaker   $ env
 
-      resp (mk st hs)
+      resp (make status headers)
 
     where
       finalize :: ActionEnv -> IO ()
@@ -327,6 +331,14 @@ where
   getHeaderDefault :: (MonadAction m)
                    => HeaderName -> ByteString -> m ByteString
   getHeaderDefault n v = fromMaybe v <$> getHeaderMaybe n
+
+
+  -- |
+  -- Obtain the login and password pair from the Authorization
+  -- request header, if present.
+  --
+  getBasicAuth :: (MonadAction m) => m (Maybe (Text, Text))
+  getBasicAuth = (parseBasicAuth =<<) <$> getHeaderMaybe "Authorization"
 
 
   -- |
@@ -1260,6 +1272,22 @@ where
   cs2 :: (ConvertibleStrings a c, ConvertibleStrings b d)
       => (a, b) -> (c, d)
   cs2 (x, y) = (cs x, cs y)
+
+
+  decodeBase64 :: ByteString -> Either String ByteString
+  decodeBase64 bstr = convertFromBase Base64 bstr
+
+
+  parseBasicAuth :: ByteString -> Maybe (Text, Text)
+  parseBasicAuth value =
+    case words value of
+      [method, auth] | mk method == "Basic" -> do
+        case decodeBase64 auth of
+          Left _   -> Nothing
+          Right lp -> let (l, p) = span (/= ':') lp
+                       in Just (cs l, cs (drop 1 p))
+
+      _otherwise -> Nothing
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
