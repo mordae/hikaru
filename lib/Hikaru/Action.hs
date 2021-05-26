@@ -97,10 +97,6 @@ module Hikaru.Action
   , dropCache
   , dropCaches
 
-  -- ** Configuration
-  , getConfigMaybe
-  , getConfigDefault
-
   -- ** Finalizing
   , registerFinalizer
 
@@ -127,7 +123,6 @@ where
   import Data.Binary.Builder
   import Data.Dynamic
   import Data.List (deleteBy, lookup, map, filter)
-  import Hikaru.Config
   import Hikaru.Media
   import Hikaru.Types
   import Lucid
@@ -204,7 +199,6 @@ where
   data ActionEnv
     = ActionEnv
       { aeRequest      :: Request
-      , aeConfig       :: Config
       , aeBody         :: IORef RequestBody
       , aeRespStatus   :: IORef Status
       , aeRespHeaders  :: IORef ResponseHeaders
@@ -226,9 +220,9 @@ where
   --
   -- Whole operation is bracketed to ensure all finalizers are run.
   --
-  respond :: Config -> (ActionEnv -> IO ()) -> Application
-  respond cfg run req resp = do
-    env <- makeActionEnv cfg req
+  respond :: (ActionEnv -> IO ()) -> Application
+  respond run req resp = do
+    env <- makeActionEnv req
 
     bracket_ (return ()) (finalize env) do
       _   <- run env
@@ -278,10 +272,9 @@ where
   -- |
   -- Create an initial action environment to handle given 'Request'.
   --
-  makeActionEnv :: Config -> Request -> IO ActionEnv
-  makeActionEnv cfg req = do
+  makeActionEnv :: Request -> IO ActionEnv
+  makeActionEnv req = do
     aeRequest     <- pure req
-    aeConfig      <- pure cfg
     aeBody        <- newIORef BodyUnparsed
     aeRespStatus  <- newIORef status200
     aeRespHeaders <- newIORef []
@@ -1237,27 +1230,6 @@ where
   dropCaches :: (MonadAction m) => m ()
   dropCaches = do
     modifyActionField aeCache (const Map.empty)
-
-
-  -- Configuration -----------------------------------------------------------
-
-
-  -- |
-  -- Lookup a configuration value.
-  --
-  getConfigMaybe :: (MonadAction m, Param a) => Text -> m (Maybe a)
-  getConfigMaybe name = do
-    ActionEnv{aeConfig} <- getActionEnv
-    return $ fromParam =<< Map.lookup name aeConfig
-
-
-  -- |
-  -- Lookup a configuration value with a fallback to return if not found.
-  --
-  getConfigDefault :: (MonadAction m, Param a) => Text -> a -> m a
-  getConfigDefault name value = do
-    ActionEnv{aeConfig} <- getActionEnv
-    return $ fromMaybe value $ fromParam =<< Map.lookup name aeConfig
 
 
   -- Finalizing --------------------------------------------------------------
