@@ -155,6 +155,8 @@ where
   instance Param Bool where
     fromParam "true"  = Just True
     fromParam "True"  = Just True
+    fromParam "yes"   = Just True
+    fromParam "Yes"   = Just True
     fromParam "on"    = Just True
     fromParam "On"    = Just True
     fromParam "1"     = Just True
@@ -162,6 +164,8 @@ where
     fromParam "False" = Just False
     fromParam "off"   = Just False
     fromParam "Off"   = Just False
+    fromParam "no"    = Just False
+    fromParam "No"    = Just False
     fromParam "0"     = Just False
     fromParam _else   = Nothing
     {-# INLINE fromParam #-}
@@ -177,6 +181,14 @@ where
     {-# INLINE fromParam #-}
 
     toParam char = pack [char]
+    {-# INLINE toParam #-}
+
+  instance Param String where
+    fromParam "" = Nothing
+    fromParam sp = Just (cs sp)
+    {-# INLINE fromParam #-}
+
+    toParam = cs
     {-# INLINE toParam #-}
 
   instance Param Text where
