@@ -5,8 +5,8 @@ version: 0.1.0.0
 homepage: https://github.com/mordae/hikaru#readme
 bug-reports: https://github.com/mordae/hikaru/issues
 
-license: AGPL-3.0-or-later
-license-file: LICENSE.md
+license: MIT
+license-file: LICENSE
 copyright: Jan Hamal Dvořák
 maintainer: mordae@anilinux.org
 author: Jan Hamal Dvořák

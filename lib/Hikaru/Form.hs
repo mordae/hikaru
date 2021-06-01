@@ -1,7 +1,7 @@
 {-|
 Module      :  Hikaru.Form
 Copyright   :  Jan Hamal Dvořák
-License     :  AGPL-3.0-or-later
+License     :  MIT
 
 Maintainer  :  mordae@anilinux.org
 Stability   :  unstable
