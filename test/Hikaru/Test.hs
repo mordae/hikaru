@@ -1,14 +1,14 @@
-{-|
-Module      :  Hikaru.Test
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-Common testing definitions.
--}
+-- |
+-- Module      :  Hikaru.Test
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- Common testing definitions.
+--
 
 module Hikaru.Test
   ( get

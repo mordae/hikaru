@@ -1,60 +1,60 @@
-{-|
-Module      :  Hikaru.Localize
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides support for website localization.
-
-First, you need to create a message catalog:
-
-@
--- All messages we want to localize.
-data SampleMessages
-  = MsgSuccess
-  | MsgFailure
-  deriving (Show)
-
--- Default HTML rendering of the messages.
-instance 'ToHtml' SampleMessages where
-  'toHtmlRaw' = 'toHtml'
-
--- Language-specific rendering of those messages.
-instance Localizable SampleMessages where
-  -- English variants
-  'localize' \"en\" MsgSuccess = 'Just' \"Success\"
-  'localize' \"en\" MsgFailure = 'Just' \"Failure\"
-
-  -- Czech variants
-  'localize' \"cs\" MsgSuccess = 'Just' \"Úspěch\"
-  'localize' \"cs\" MsgFailure = 'Just' \"Selhání\"
-
-  -- Otherwise try the next locale
-  'localize' _locale _msg = 'Nothing'
-@
-
-Next, create a preferred language list for every action:
-
-@
-'Hikaru.Dispatch.dispatch' runAction $ do
-  'Hikaru.Dispatch.wrapAction' ('selectLanguages' \"lang\" \"lang\" >>) $ do
-    'Hikaru.Dispatch.route' ...
-@
-
-Finally, you can use your catalog when rendering pages:
-
-@
-getSampleR :: 'Bool' -> Action ()
-getSampleR flag = do
-  'sendHTML' $ do
-    if flag
-       then lc_ MsgSuccess
-       else lc_ MsgFailure
-@
--}
+-- |
+-- Module      :  Hikaru.Localize
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides support for website localization.
+--
+-- First, you need to create a message catalog:
+--
+-- @
+-- -- All messages we want to localize.
+-- data SampleMessages
+--   = MsgSuccess
+--   | MsgFailure
+--   deriving (Show)
+--
+-- -- Default HTML rendering of the messages.
+-- instance 'ToHtml' SampleMessages where
+--   'toHtmlRaw' = 'toHtml'
+--
+-- -- Language-specific rendering of those messages.
+-- instance Localizable SampleMessages where
+--   -- English variants
+--   'localize' \"en\" MsgSuccess = 'Just' \"Success\"
+--   'localize' \"en\" MsgFailure = 'Just' \"Failure\"
+--
+--   -- Czech variants
+--   'localize' \"cs\" MsgSuccess = 'Just' \"Úspěch\"
+--   'localize' \"cs\" MsgFailure = 'Just' \"Selhání\"
+--
+--   -- Otherwise try the next locale
+--   'localize' _locale _msg = 'Nothing'
+-- @
+--
+-- Next, create a preferred language list for every action:
+--
+-- @
+-- 'Hikaru.Dispatch.dispatch' runAction $ do
+--   'Hikaru.Dispatch.wrapAction' ('selectLanguages' \"lang\" \"lang\" >>) $ do
+--     'Hikaru.Dispatch.route' ...
+-- @
+--
+-- Finally, you can use your catalog when rendering pages:
+--
+-- @
+-- getSampleR :: 'Bool' -> Action ()
+-- getSampleR flag = do
+--   'sendHTML' $ do
+--     if flag
+--        then lc_ MsgSuccess
+--        else lc_ MsgFailure
+-- @
+--
 
 module Hikaru.Localize
   ( Locale
@@ -157,8 +157,8 @@ where
     preferred <- getParamMaybe paramName
     previous  <- getCookieMaybe cookieName
     acceptable <- getAcceptLanguage
-                  <&> filter ((> 0) . mediaQuality)
-                  <&> map mediaMainType
+                  <&> filter ((> 0) . quality)
+                  <&> map mainType
 
     case preferred of
       Nothing   -> return ()

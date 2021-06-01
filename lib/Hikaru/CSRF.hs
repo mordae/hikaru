@@ -1,14 +1,14 @@
-{-|
-Module      :  Hikaru.CSRF
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides CSRF mitigation utilities.
--}
+-- |
+-- Module      :  Hikaru.CSRF
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides CSRF mitigation utilities.
+--
 
 module Hikaru.CSRF
   ( generateToken

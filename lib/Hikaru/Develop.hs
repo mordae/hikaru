@@ -1,14 +1,14 @@
-{-|
-Module      :  Hikaru.Develop
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides development and testing utilities.
--}
+-- |
+-- Module      :  Hikaru.Develop
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides development and testing utilities.
+--
 
 module Hikaru.Develop
   ( developWith

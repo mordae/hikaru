@@ -1,12 +1,12 @@
-{-|
-Module      :  Spec
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
--}
+-- |
+-- Module      :  Spec
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
 
 {-# OPTIONS_GHC -F -pgmF hspec-discover #-}
 

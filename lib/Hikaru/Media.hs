@@ -1,16 +1,16 @@
-{-|
-Module      :  Hikaru.Media
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides means for parsing HTTP media lists that can be found
-in the headers such as @Accept@, @Accept-Charset@, @Accept-Encoding@ and
-@Accept-Language@.
--}
+-- |
+-- Module      :  Hikaru.Media
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides means for parsing HTTP media lists that can be found
+-- in headers such as @Accept@, @Accept-Charset@, @Accept-Encoding@ and
+-- @Accept-Language@.
+--
 
 module Hikaru.Media
   ( Media(..)
@@ -29,7 +29,7 @@ where
 
   import Data.Text (toLower)
 
-  import Data.List (filter, lookup, head, sortOn)
+  import Data.List (filter, lookup, sortOn)
   import Text.ParserCombinators.ReadP
   import Data.Char (isControl, isSpace)
 
@@ -38,23 +38,27 @@ where
   -- Single media element.
   --
   -- When used for media without a subtype (such as languages or encodings),
-  -- the respective field is just @""@ while quality defaults to @1.0@.
+  -- the subType field is just @""@ while quality defaults to @1.0@.
   --
   data Media
     = Media
-      { mediaMainType  :: Text
-      , mediaSubType   :: Text
-      , mediaParams    :: [(Text, Text)]
-      , mediaQuality   :: Float
+      { mainType       :: Text
+      , subType        :: Text
+      , params         :: [(Text, Text)]
+      , quality        :: Float
       }
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Generic)
+
+  instance NFData Media
 
   -- |
   -- You can construct media elements using @OverloadedStrings@.
   -- Just be careful - invalid syntax means a runtime error.
   --
   instance IsString Media where
-    fromString = head . parseMedia . cs
+    fromString str = case parseMedia (cs str) of
+                       m:_   -> m
+                       _else -> error $ "Failed to parse media " <> show str
 
 
   -- |
@@ -64,13 +68,13 @@ where
   -- Example:
   --
   -- >>> parseMedia "text/html, text/plain;q=0.7"
-  -- [ Media { mediaMainType = "text", mediaSubType = "html",  mediaQuality = 1.0 }
-  -- , Media { mediaMainType = "text", mediaSubType = "plain", mediaQuality = 0.7 }
+  -- [ Media { mainType = "text", subType = "html", quality = 1.0, params = [] }
+  -- , Media { mainType = "text", subType = "plain", quality = 0.7, params = [] }
   -- ]
   --
   parseMedia :: Text -> [Media]
   parseMedia text = case readP_to_S pMediaList (cs (toLower text)) of
-                      (m, ""):_ -> sortOn (negate . mediaQuality) m
+                      (m, ""):_ -> sortOn (negate . quality) m
                       _else     -> []
 
 
@@ -82,14 +86,14 @@ where
   pMediaList = sepBy pMedia pSeparator <* eof
     where
       pMedia = do
-        mediaMainType <- cs <$> pToken
-        _             <- char '/'
-        mediaSubType  <- cs <$> pToken
-        mediaParams   <- many pParameter
+        mainType <- cs <$> pToken
+        _        <- char '/'
+        subType  <- cs <$> pToken
+        params   <- many pParameter
 
-        let mediaQuality = fromMaybe 1.0 do
-                             q <- lookup "q" mediaParams
-                             readMaybe (cs q)
+        let quality = fromMaybe 1.0 do
+                        q <- lookup "q" params
+                        readMaybe (cs q)
 
         return Media{..}
 
@@ -129,13 +133,10 @@ where
   -- False
   --
   matchMedia :: Media -> Media -> Bool
-  matchMedia l r = mainMatches && subMatches && mediaQuality r > 0.0
+  matchMedia l r = mainMatches && subMatches && quality r > 0.0
     where
-      mainMatches = mediaMainType l == mediaMainType r
-                    || mediaMainType r == "*"
-
-      subMatches  = mediaSubType l == mediaSubType r
-                    || mediaSubType r == "*"
+      mainMatches = mainType l == mainType r || mainType r == "*"
+      subMatches  =  subType l == subType r  ||  subType r == "*"
 
 
   -- |
@@ -161,9 +162,9 @@ where
   selectMedia :: [Media] -> [Media] -> Maybe Media
   selectMedia ls rs = case best of
                         [ ]      -> Nothing
-                        (l, r):_ -> Just $ l { mediaQuality = mediaQuality r }
+                        (l, r):_ -> Just $ l { quality = quality r }
     where
-      best = sortOn (negate . mediaQuality . snd) good
+      best = sortOn (negate . quality . snd) good
       good = filter (uncurry matchMedia) prod
       prod = [(l, r) | l <- ls, r <- rs]
 

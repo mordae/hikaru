@@ -1,7 +1,7 @@
 cabal-version: 3.0
 
 name: hikaru
-version: 0.1.0.0
+version: 0.2.0.0
 homepage: https://github.com/mordae/hikaru#readme
 bug-reports: https://github.com/mordae/hikaru/issues
 
@@ -33,7 +33,9 @@ common common
 
     default-extensions:
         AllowAmbiguousTypes
+        BangPatterns
         BlockArguments
+        ConstraintKinds
         DataKinds
         DefaultSignatures
         DeriveGeneric
@@ -41,7 +43,6 @@ common common
         EmptyDataDecls
         FlexibleContexts
         FlexibleInstances
-        GADTs
         GeneralizedNewtypeDeriving
         ImportQualifiedPost
         KindSignatures
@@ -50,12 +51,15 @@ common common
         NamedFieldPuns
         NoImplicitPrelude
         OverloadedStrings
+        PolyKinds
         RankNTypes
         RecordWildCards
         ScopedTypeVariables
         StandaloneDeriving
         TupleSections
         TypeApplications
+        TypeFamilies
+        TypeOperators
         UndecidableInstances
 
     ghc-options:
@@ -68,7 +72,7 @@ common common
 
     build-depends:
       , aeson              >=1.4  && <1.6
-      , base               >=4.13 && <4.16
+      , base               >=4.13 && <5
       , binary             >=0.8  && <0.9
       , bytestring         >=0.10 && <0.12
       , case-insensitive   >=1.2  && <1.3
@@ -77,6 +81,7 @@ common common
       , cryptonite         >=0.26 && <0.29
       , foreign-store      >=0.2  && <0.3
       , http-types         >=0.12 && <0.13
+      , hvect              >=0.4  && <0.5
       , lucid              >=2.9  && <2.10
       , memory             >=0.15 && <0.16
       , mtl                >=2.2  && <2.3

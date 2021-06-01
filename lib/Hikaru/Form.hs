@@ -1,29 +1,28 @@
-{-|
-Module      :  Hikaru.Form
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides tools for building localized HTML forms
-with server-side validation.
-
-There are three important steps involved:
-
-1. A 'Form' needs to be defined first. For that you need to supply the
-   underlying data type as well as high-level description of the form
-   elements.
-
-2. It needs be fed some request data. You control what data by using
-   'newForm', 'getForm' or 'postForm'.
-
-3. It needs to be rendered as HTML. This module will leave you with a
-   high-level form 'View', but you need to take care of the rendering
-   yourself.
-
--}
+-- |
+-- Module      :  Hikaru.Form
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides tools for building localized HTML forms
+-- with server-side validation.
+--
+-- There are three important steps involved:
+--
+-- 1. A 'Form' needs to be defined first. For that you need to supply the
+--    underlying data type as well as high-level description of the form
+--    elements.
+--
+-- 2. It needs be fed some request data. You control what data by using
+--    'newForm', 'getForm' or 'postForm'.
+--
+-- 3. It needs to be rendered as HTML. This module will leave you with a
+--    high-level form 'View', but you need to take care of the rendering
+--    yourself.
+--
 
 module Hikaru.Form
   (
@@ -118,7 +117,9 @@ where
       , envValue       :: Maybe o
       , envValidate    :: Bool
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData o) => NFData (Env o)
 
 
   -- |
@@ -132,7 +133,9 @@ where
       { viewElements   :: [Element l]
       , viewControls   :: [Control l]
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (View l)
 
 
   -- |
@@ -190,7 +193,9 @@ where
       { elemLabel      :: l
       , elemControls   :: [Control l]
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (Element l)
 
 
   -- |
@@ -228,7 +233,10 @@ where
       , ctrlNotes      :: [Note l]
       , ctrlHints      :: [Dynamic]
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (Control l) where
+    rnf Control{..} = rnf (ctrlName, ctrlField, ctrlNotes)
 
 
   data ControlState l v m
@@ -239,6 +247,10 @@ where
       , csValidators   :: [Maybe v -> m [Note l]]
       , csValue        :: Maybe v
       }
+    deriving (Generic)
+
+  instance (NFData l, NFData v) => NFData (ControlState l v m) where
+    rnf ControlState{..} = rnf (csName, csField, csValidators, csValue)
 
   instance (Show l, Show v) => Show (ControlState l v m) where
     show ControlState{..} =
@@ -267,9 +279,7 @@ where
     lift = ControlT . lift . lift
     {-# INLINE lift #-}
 
-  instance (MonadAction m) => MonadAction (ControlT t l o v m) where
-    getActionEnv = ControlT $ lift $ lift $ getActionEnv
-    {-# INLINE getActionEnv #-}
+  instance (MonadAction m) => MonadAction (ControlT t l o v m)
 
 
   -- |
@@ -281,7 +291,9 @@ where
       { noteSeverity   :: Severity
       , noteMessage    :: l
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (Note l)
 
 
   -- |
@@ -299,7 +311,9 @@ where
     | SelectField
       { fieldOptions   :: [Option l]
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (Field l)
 
 
   -- |
@@ -308,7 +322,9 @@ where
   data FieldTag
     = InputFieldTag
     | SelectFieldTag
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
+
+  instance NFData FieldTag
 
 
   -- |
@@ -320,7 +336,9 @@ where
       , optionSelected :: Bool
       , optionValue    :: Text
       }
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance (NFData l) => NFData (Option l)
 
 
   class ToOption l o where
@@ -380,7 +398,9 @@ where
   data FormMessage
     = FormMsgFieldRequired
     | FormMsgTokenInvalid
-    deriving (Show)
+    deriving (Show, Generic)
+
+  instance NFData FormMessage
 
   instance Localizable FormMessage where
     -- Czech strings

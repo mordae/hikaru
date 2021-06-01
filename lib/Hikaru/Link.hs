@@ -1,127 +1,114 @@
-{-|
-Module      :  Hikaru.Link
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides various ways to build local links and provide
-feedback based on the request path.
--}
+-- |
+-- Module      :  Hikaru.Link
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides various ways to build local links and provide
+-- feedback based on the request path.
+--
 
 module Hikaru.Link
-  ( makeLink
-  , deriveLink
-
-  -- ** Lucid Integration
-  , lhref_
-  , phref_
-  , qhref_
-
-  -- ** Path Feedback
-  , isActivePath
-  , isActivePrefix
+  ( rhref
+  , rhref_
+  , updateQuery
+  , isActiveRoute
   )
 where
-  import Praha
+  import Praha hiding (curry)
+
+  import Hikaru.Action
+  import Hikaru.Route
+  import Hikaru.Types
+
+  import Network.HTTP.Types.URI
 
   import Data.Binary.Builder
+  import Data.List (map, filter)
+  import Data.Maybe (isJust)
+
+  import Data.HVect
+
   import Lucid
-  import Network.HTTP.Types.URI
-  import Hikaru.Action
-  import Data.List (isPrefixOf, map, filter)
 
 
   -- |
-  -- Combine path segments and parameters to create an internal Link.
+  -- Construct a link with a query string to the given route,
+  -- using given values for captured segments.
   --
-  -- Examples:
+  -- Example:
   --
-  -- >>> makeLink ["api", "echo"] []
-  -- "/api/echo"
-  -- >>> makeLink ["char", ""] [("name", "haruhi")]
-  -- "/char/?name=haruhi"
+  -- >>> rhref getEchoR "Hi" [("q", "42")]
+  -- "/echo/Hi?q=42"
   --
-  makeLink :: [Text] -> [(Text, Text)] -> Text
-  makeLink ps qs = cs $ toLazyByteString $ encodePath ps $ csQueryTuple qs
+  rhref :: (HasRep ts, AllHave Param ts)
+        => Route ts a
+        -> HVectElim ts ([(Text, Text)] -> Text)
+  rhref route = curry (hvRhref route)
+
+
+  hvRhref :: (AllHave Param ts)
+          => Route ts a -> HVect ts -> [(Text, Text)] -> Text
+  hvRhref route xs qs = buildLink route xs qs
 
 
   -- |
-  -- Create a link with just the query string by updating the
-  -- parameters sent by the client.
+  -- Similar to 'rhref', but inteded to be used with Lucid.
   --
-  -- All keys that appear in the new parameter list are first deleted
-  -- from the current parameter list, then the new list is appended to
-  -- the current one.
+  -- Example:
   --
-  -- Useful to create dynamic pages with multiple independent widgets.
+  -- @
+  -- qs <- updateQuery [("conv", "upper")]
+  -- 'a_' ['rhref_' getEchoR "Hi" qs] ...
+  -- @
   --
-  deriveLink :: (MonadAction m) => [(Text, Text)] -> m Text
-  deriveLink ps = do
-    ops <- getParams
-    return $ makeLink [] $ update ops ps
+  rhref_ :: (HasRep ts, AllHave Param ts)
+         => Route ts a
+         -> HVectElim ts ([(Text, Text)] -> Attribute)
+  rhref_ route = curry (hvRhref_ route)
 
 
-  csQueryTuple :: [(Text, Text)] -> [(ByteString, Maybe ByteString)]
-  csQueryTuple = map \(n, v) -> (cs n, Just (cs v))
+  hvRhref_ :: (AllHave Param ts)
+           => Route ts a -> HVect ts -> [(Text, Text)] -> Attribute
+  hvRhref_ route xs qs = href_ (buildLink route xs qs)
 
 
-  update :: [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)]
-  update old new = deleteNewKeys old <> new
+  buildLink :: (AllHave Param ts)
+            => Route ts a -> HVect ts -> [(Text, Text)] -> Text
+  buildLink route xs qs = cs (toLazyByteString (path <> query))
     where
-      deleteNewKeys = filter \(n, _) -> n `notElem` newKeys
-      newKeys = map fst new
+      path = case routeLinkHVect route xs of
+               [] -> "/"
+               ps -> encodePathSegments ps
 
-
-  -- Lucid Integration -------------------------------------------------------
-
-
-  -- |
-  -- Create a @href@ attribute using 'makeLink'.
-  --
-  lhref_ :: [Text] -> [(Text, Text)] -> Attribute
-  lhref_ ps qs = href_ (makeLink ps qs)
-  {-# INLINE lhref_ #-}
+      query = renderQueryBuilder True $
+                flip map qs \(n, v) -> (cs n, Just (cs v))
 
 
   -- |
-  -- Same as 'lhref_', but without any query parameters.
+  -- Update query string from the original request with supplied values.
   --
-  phref_ :: [Text] -> Attribute
-  phref_ ps = href_ (makeLink ps [])
-  {-# INLINE phref_ #-}
-
-
-  -- |
-  -- Same as 'lhref_', but without any path components.
+  -- First, all keys in the supplied query are removed from the original,
+  -- then the supplied query gets appended to the original.
   --
-  qhref_ :: [(Text, Text)] -> Attribute
-  qhref_ qs = href_ (makeLink [] qs)
-  {-# INLINE qhref_ #-}
+  updateQuery :: (MonadAction m) => [(Text, Text)] -> m [(Text, Text)]
+  updateQuery query' = do query <- filter (not. updated) <$> getParams
+                          return (query <> query')
+    where
+      updated (key, _) = key `elem` map fst query'
 
 
   -- Path Feedback -----------------------------------------------------------
 
 
   -- |
-  -- Determine whether the supplied path is the one user has requested.
+  -- Determine whether the supplied route is the one user has requested.
   --
-  isActivePath :: (MonadAction m) => [Text] -> m Bool
-  isActivePath link = do
-    path <- getPathInfo
-    return $ link == path
-
-
-  -- |
-  -- Determine whether the supplied path is a prefix of the one user has
-  -- requested. Empty path components in the supplied path are ignored.
-  --
-  isActivePrefix :: (MonadAction m) => [Text] -> m Bool
-  isActivePrefix link = do
-    path <- getPathInfo
-    return $ isPrefixOf (filter (/= "") link) path
+  isActiveRoute :: (MonadAction m) => Route ts a -> m Bool
+  isActiveRoute route = isJust <$> flip routeApply route <$> getPathInfo
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

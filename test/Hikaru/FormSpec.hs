@@ -1,12 +1,12 @@
-{-|
-Module      :  Hikaru.FormSpec
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
--}
+-- |
+-- Module      :  Hikaru.FormSpec
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
 
 module Hikaru.FormSpec
   ( spec

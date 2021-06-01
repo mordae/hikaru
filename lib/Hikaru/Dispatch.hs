@@ -1,247 +1,168 @@
-{-|
-Module      :  Hikaru.Dispatch
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides monad-based request dispatching.
--}
+-- |
+-- Module      :  Hikaru.Dispatch
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides means for dispatching on routes.
+--
+-- For example:
+--
+-- @
+-- demo :: 'Application'
+-- demo = 'dispatch' id do
+--   'middleware' logStdout
+--   'handler' 404 notFound
+--   'route' getHelloR
+--   'route' getByeR
+-- @
+--
 
 module Hikaru.Dispatch
-  ( dispatch
-
-  -- ** Routes
+  ( Dispatch
+  , dispatch
   , route
-  , wrapRoute
-  , wrapRoutes
-  , wrapAction
-  , wrapActions
-
-  -- ** Middleware
   , middleware
-
-  -- ** Error Handlers
   , handler
-
-  -- * Types
-  , Dispatch
-  , Nested
-  , TopLevel
   )
 where
-  import Praha
+  import Praha hiding (curry)
 
-  import Control.Monad.State
-  import Data.CaseInsensitive (original)
-  import Data.List (lookup, deleteBy, intersperse, reverse, map)
+  import Hikaru.Action (abortMiddleware)
   import Hikaru.Route
-  import Hikaru.Types
+
+  import Network.HTTP.Types.Status
   import Network.HTTP.Types.Header
   import Network.Wai
-  import UnliftIO.Exception
 
-  import qualified Data.Map.Strict as Map
+  import Data.List (reverse, lookup, sortOn)
 
 
   -- |
-  -- Monad for the 'dispatch' function.
+  -- Since routes do not share a common type (due to their captured parameters
+  -- being part of their type), we cannot just pass them in a list. So for
+  -- convenience, there is a dispatcher monad that also helps with middleware
+  -- and error handler registration.
   --
-  newtype Dispatch r l a
+  newtype Dispatch h a
     = Dispatch
-      { unDispatch     :: State (Env r) a
+      { runDispatch    :: State (Env h) a
       }
     deriving (Functor, Applicative, Monad)
 
 
-  -- |
-  -- Part of the top-level 'Dispatch' signature.
-  --
-  data TopLevel
-
-
-  -- |
-  -- Part of the nested 'Dispatch' signature.
-  --
-  data Nested
-
-
-  data Env r
+  data Env h
     = Env
-      { envRouteWrap   :: Route r -> Route r
-      , envActionWrap  :: r -> r
-      , envHandlers    :: Map RequestError (RequestError -> Text -> r)
-      , envMiddleware  :: Middleware
-      , envRoutes      :: [Route r]  -- in reverse order
+      { routes         :: [Request -> Maybe (h, Score)]
+      , mwstack        :: Middleware
+      , handlers       :: [(Int, Response -> h)]
       }
 
 
-  initEnv :: Env r
-  initEnv = Env id id mempty id mempty
+  initEnv :: Env h
+  initEnv = Env { routes   = []
+                , mwstack  = id
+                , handlers = []
+                }
 
 
   -- |
-  -- Create an application out of routes, handlers and middleware.
+  -- Try to dispatch on a route.
   --
-  -- You can use 'route', 'handler', 'middleware' to register each of
-  -- these components respectively.
+  -- All routes are tried and scored for every request,
+  -- preferring the earlier one in case of a tie.
   --
-  -- @
-  -- app :: Application
-  -- app = dispatch runAction $ do
-  --   'middleware' $ logStdoutDev
-  --
-  --   'route' $ getRootR  \<$ 'Hikaru.Route.get'
-  --   'route' $ getHelloR \<$ 'Hikaru.Route.get' \<\/ "hello" \<*\> 'arg'
-  --
-  --   'wrapRoute' needAuth $ do
-  --     'route' $ getAdminR \<$ 'Hikaru.Route.get'  \<\/ "admin"
-  --     'route' $ postPassR \<$ 'Hikaru.Route.post' \<\/ "admin" \<\/ "password"
-  --
-  --   'handler' 'NotFound' notFoundR
-  -- @
-  --
-  dispatch :: forall r. (r -> Application)
-           -> forall a. Dispatch r TopLevel a
-           -> Application
-  dispatch runner = build runner . flip execState initEnv . unDispatch
+  route :: Route (ts :: [Type]) h -> Dispatch h ()
+  route r = Dispatch do
+    let r' req = case routeApply (pathInfo req) r of
+                   Just h  -> Just (h, routeScore req r)
+                   Nothing -> Nothing
 
-
-  build :: forall r. (r -> Application) -> Env r -> Application
-  build runner Env{..} = envMiddleware app'
-    where
-      app' req resp = mw app req resp
-        where
-          (mw, app) = case selectRoute (reverse envRoutes) req of
-                        RouteFailed exn msg vhs -> (addVary vhs, err exn msg)
-                        RouteSuccess ac _qu vhs -> (addVary vhs, run ac)
-
-          run :: r -> Application
-          run x req' resp' = catch (runner x req' resp')
-                                   (\(exn, msg) -> mw (err exn msg) req' resp')
-
-          err :: RequestError -> Text -> Application
-          err exn msg = case Map.lookup exn envHandlers of
-                          Just eh -> runner (eh exn msg)
-                          Nothing -> defaultHandler exn msg
+    -- Routes must be prepended since we will later sort them and
+    -- reverse the order, making the earlier matching routes come
+    -- out first.
+    modify \e@Env{..} -> e { routes = r' : routes }
 
 
   -- |
-  -- Make sure that the @Vary@ response header contains specified names.
+  -- Register middleware.
   --
-  addVary :: [HeaderName] -> Middleware
-  addVary vs = if vs == [] then id else apply
-    where
-      apply = modifyResponse (mapResponseHeaders fixup)
-      fixup = modifyHeader "Vary" (maybe value (<> ", " <> value))
-      value = mconcat $ intersperse ", " $ map original vs
-
-      modifyHeader n fn hs = (n, v') : Data.List.deleteBy headerEq (n, v') hs
-        where v' = fn (Data.List.lookup n hs)
-
-      headerEq (x, _) (y, _) = x == y
-
-
-  -- |
-  -- Register a route.
+  -- Middleware gets applied in the reverse order of its appearence,
+  -- but always after the error handler.
   --
-  -- When multiple routes match with the same quality coefficient,
-  -- the one registered first will be selected.
-  --
-  route :: Route r -> Dispatch r l ()
-  route rt = Dispatch do
-    modify \env@Env{..} ->
-      env { envRoutes = envRouteWrap (fmap envActionWrap rt) : envRoutes }
-
-
-  -- |
-  -- Wrap all nested routes with a route transformer.
-  --
-  -- It is a little bit similar to the middleware, but route-specific and
-  -- with full access to the routing utilities. Can be used e.g. to apply
-  -- authentication to multiple routes at once or to update their content
-  -- negotiation parameters.
-  --
-  wrapRoute :: (Route r -> Route r) -> Dispatch r Nested a -> Dispatch r l ()
-  wrapRoute wrapper disp = Dispatch do
-    modify \env ->
-      let env' = execState (unDispatch disp)
-                           (env { envRouteWrap = envRouteWrap env . wrapper })
-
-       in env { envRoutes = envRoutes env' <> envRoutes env }
-
-
-  -- |
-  -- Wrap all /following/ routes with a route transformer.
-  --
-  wrapRoutes :: (Route r -> Route r) -> Dispatch r l ()
-  wrapRoutes wrapper = Dispatch do
-    modify \env -> env { envRouteWrap = envRouteWrap env . wrapper }
-
-
-  -- |
-  -- Wrap all nested actions with an action transformer.
-  --
-  wrapAction :: (r -> r) -> Dispatch r Nested a -> Dispatch r l ()
-  wrapAction wrapper disp = Dispatch do
-    modify \env ->
-      let env' = execState (unDispatch disp)
-                           (env { envActionWrap = envActionWrap env . wrapper })
-       in env { envRoutes = envRoutes env' <> envRoutes env }
-
-
-  -- |
-  -- Wrap all /following/ actions with an action transformer.
-  --
-  -- This can come in handy e.g. to tune cache control:
-  --
-  -- @
-  -- app :: Application
-  -- app = 'dispatch' runAction $ do
-  --   'wrapRoutes' ('Hikaru.Action.defaultHeader' hCacheControl "no-cache" >>)
-  --
-  --   'route' $ getRootR  \<$ 'Hikaru.Route.get'
-  --   'route' $ getHelloR \<$ 'Hikaru.Route.get' \<\/ "hello" \<*\> 'arg'
-  -- @
-  --
-  wrapActions :: (r -> r) -> Dispatch r l ()
-  wrapActions wrapper = Dispatch do
-    modify \env -> env { envActionWrap = envActionWrap env . wrapper }
-
-
-  -- |
-  -- Register a middleware.
-  --
-  -- They are applied in the reverse order of their registation,
-  -- i.e. the first one to be registered is the last one to be applied.
-  --
-  -- Middleware can only be registered at the top level of the dispatcher.
-  --
-  middleware :: Middleware -> Dispatch r TopLevel ()
+  middleware :: Middleware -> Dispatch h ()
   middleware mw = Dispatch do
-    modify \env@Env{envMiddleware} ->
-      env { envMiddleware = envMiddleware . mw }
+    modify \e@Env{..} -> e { mwstack = mwstack . mw }
 
 
   -- |
-  -- Register a 'RequestError' handler.
+  -- Register error handler.
   --
-  -- The handler is passed the original request and is supposed to
-  -- inform the user about the issue. It should use the correct HTTP
-  -- status code.
+  -- It gets called when some of the routes respond with given status code.
+  -- Middleware gets applied after the handler, not before.
   --
-  -- If you need to perform content negotiation in the handler,
-  -- you can use 'dispatch' in it as well. Just make sure to provide a
-  -- route that cannot fail.
+  handler :: Int -> (Response -> h) -> Dispatch h ()
+  handler code fn = Dispatch do
+    modify \e@Env{..} -> e { handlers = (code, fn) : handlers }
+
+
+  -- |
+  -- Perform the dispatching.
   --
-  handler :: RequestError
-          -> (RequestError -> Text -> r)
-          -> Dispatch r TopLevel ()
-  handler e h = Dispatch do
-    modify \env@Env{envHandlers} ->
-      env { envHandlers = Map.insert e h envHandlers }
+  -- Needs a runner function that converts whatever saturated routes produce
+  -- into a regular WAI 'Application'.
+  --
+  -- If no route matches or matching routes all fail during appraisal, an
+  -- error response gets generated. It is extremely simple, @text/plain@
+  -- response with the status code and message repeated in the body.
+  -- You can register your own 'handler', though.
+  --
+  dispatch :: (h -> Application) -> Dispatch h a -> Application
+  dispatch run Dispatch{runDispatch} req = do
+    let Env{..} = execState runDispatch initEnv
+
+    let good = mapMaybe ($ req) routes
+        best = reverse (sortOn snd good)
+
+    let app = case best of
+                (h, Suitable _):_ -> run h
+                (_, reason):_     -> err reason
+                []                -> err NotFound
+
+    let mwstack' = mwstack . handlerMW run handlers . abortMiddleware
+
+    mwstack' app req
+
+
+  err :: Score -> Application
+  err BadRequest           = respond status400
+  err NotFound             = respond status404
+  err MethodNotAllowed     = respond status405
+  err UpgradeRequired      = respond status426
+  err NotAcceptable        = respond status406
+  err LengthRequired       = respond status411
+  err UnsupportedMediaType = respond status415
+  err (Suitable _)         = error "BUG: errored out with a Suitable"
+
+
+  respond :: Status -> Application
+  respond st@Status{..} _ sink = sink $ responseLBS st hdr msg
+    where
+      hdr = [(hContentType, "text/plain")]
+      msg = cs (show statusCode) <> " " <> cs statusMessage
+
+
+  handlerMW :: (h -> Application) -> [(Int, Response -> h)] -> Middleware
+  handlerMW run handlers app req sink = do
+    app req \resp -> do
+      let Status{..} = responseStatus resp
+
+      case lookup statusCode handlers of
+        Just fn -> run (fn resp) req sink
+        Nothing -> sink resp
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

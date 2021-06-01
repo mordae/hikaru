@@ -1,12 +1,12 @@
-{-|
-Module      :  Hikaru.Demo
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
--}
+-- |
+-- Module      :  Hikaru.Demo
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
 
 module Hikaru.Demo
   ( makeDemo
@@ -14,9 +14,10 @@ module Hikaru.Demo
 where
   import Praha hiding (for_)
 
+  import Hikaru
+
   import UnliftIO.MVar
   import Data.Aeson (Value)
-  import Hikaru
   import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
@@ -49,6 +50,8 @@ where
       { demoActionEnv  :: ActionEnv
       , demoModelEnv   :: ModelEnv
       }
+
+  type Handler = Action ()
 
 
   -- Model -------------------------------------------------------------------
@@ -101,130 +104,142 @@ where
   makeDemo :: IO Application
   makeDemo = do
     model <- makeModelEnv 0
-    cfg   <- configFromEnv
-    return $ makeApplication model cfg
+    return $ makeApplication model
 
 
-  runAction :: ModelEnv -> Config -> Action () -> Application
-  runAction me cfg act = do
-    respond cfg \ae -> do
+  runAction :: ModelEnv -> Action () -> Application
+  runAction me act = do
+    respond \ae -> do
       runReaderT (unAction act) (DemoEnv ae me)
 
 
-  makeApplication :: ModelEnv -> Config -> Application
-  makeApplication me cfg = do
-    dispatch (runAction me cfg) do
+  makeApplication :: ModelEnv -> Application
+  makeApplication me = do
+    dispatch (runAction me) do
       -- Register nicer 404 error handler.
-      handler NotFound handleNotFound
+      handler 404 notFound
 
       -- Negotiate content for the root page.
-      route $ getRootHtmlR <$ get <* offerHTML
-      route $ getRootTextR <$ get <* offerText
+      route getRootHtmlR
+      route getRootTextR
 
-      -- Disable caching for these endpoints:
-      wrapAction (defaultHeader hCacheControl "no-store" >>) do
-        -- Present a simple greeting page.
-        route $ getHelloR <$ get </ "hello" <*> arg
-                          <* offerText
+      -- Present a simple greeting page.
+      route getHelloR
 
-        -- Present an echoing JSON API.
-        route $ postEchoR <$ post </ "api" </ "echo"
-                          <* offerJSON <* acceptJSON
+      -- Present an echoing JSON API.
+      route postEchoR
 
-        -- Handle new cases.
-        route $ postCaseR <$ post </ "case" </ ""
-                          <* acceptForm
+      -- Handle new cases.
+      route postCaseR
 
-        -- Handle case listing.
-        route $ getCasesR <$ get </ "case" </ ""
-                          <* offerJSON
+      -- Handle case listing.
+      route getCasesR
 
 
-  -- Handlers ----------------------------------------------------------------
+  -- Routes ------------------------------------------------------------------
 
 
-  getRootHtmlR :: Action ()
-  getRootHtmlR = do
-    -- Update the counter.
-    n <- countVisitor
+  getRootHtmlR :: Route '[] Handler
+  getRootHtmlR = get handle /? offerHTML
+    where
+      handle = do
+        -- Update the counter.
+        n <- countVisitor
 
-    -- Present fancy HTML result.
-    sendHTML do
-      h1_ "Welcome!"
-      p_ $ "You are " >> toHtml (tshow n) >> ". visitor!"
-
-
-  getRootTextR :: Action ()
-  getRootTextR = do
-    -- Update the counter.
-    n <- countVisitor
-
-    -- Present a plain textual result.
-    sendText $ unlines [ "Welcome!"
-                       , "You are " <> tshow n <> ". visitor!"
-                       ]
-
-
-  postEchoR :: Action ()
-  postEchoR = do
-    (json :: Value) <- getJSON
-    sendJSON json
-
-
-  getHelloR :: Text -> Action ()
-  getHelloR name = sendText $ "Hello, " <> name <> "!"
-
-
-  handleNotFound :: RequestError -> Text -> Action ()
-  handleNotFound _exn msg = do
-    setStatus status404
-    sendHTML do
-      h1_ "404 Not Found"
-      p_ (toHtml msg)
-
-
-  postCaseR :: Action ()
-  postCaseR = do
-    (res, view) <- postForm "addCase" addCaseForm
-
-    case res of
-      Nothing -> do
-        setStatus status400
+        -- Present fancy HTML result.
         sendHTML do
-          simpleForm_ view
-
-      Just ac -> do
-        _case <- addCase ac
-        redirect "/case/"
+          h1_ "Welcome!"
+          p_ $ "You are " >> toHtml (tshow n) >> ". visitor!"
 
 
-  getCasesR :: Action ()
-  getCasesR = do
-    cases <- liftIO . readMVar . modelCases =<< getModelEnv
+  getRootTextR :: Route '[] Handler
+  getRootTextR = get handle /? offerText
+    where
+      handle = do
+        -- Update the counter.
+        n <- countVisitor
 
-    sendHTML do
-      h1_ "Cases"
+        -- Present a plain textual result.
+        sendText $ unlines [ "Welcome!"
+                           , "You are " <> tshow n <> ". visitor!"
+                           ]
 
-      form_ [method_ "POST"] do
-        view <- newForm "addCase" Nothing addCaseForm
-        simpleForm_ view
-        button_ [type_ "submit"] "Submit"
 
-      table_ do
-        tr_ do
-          th_ "Id"
-          th_ "Name"
-          th_ "RecNo"
-          th_ "Mode"
-          th_ "Active"
+  postEchoR :: Route '[] Handler
+  postEchoR = post handle // "api" // "echo" /? offerJSON /? acceptJSON
+    where
+      handle = do
+        setHeader hCacheControl "no-store"
+        (json :: Value) <- getJSON
+        sendJSON json
 
-        forM cases \Case{..} -> do
-          tr_ do
-            td_ $ toHtml $ tshow caseId
-            td_ $ toHtml $ caseName
-            td_ $ toHtml $ caseRecNo
-            td_ $ toHtml $ tshow caseMode
-            td_ $ toHtml $ tshow caseActive
+
+  getHelloR :: Route '[Text] Handler
+  getHelloR = get handle // "hello" /: "name" /? offerText
+    where
+      handle name = do
+        setHeader hCacheControl "no-store"
+
+        when (name == "nobody") do
+          abort badRequest400 [] "I don't like you."
+
+        sendText $ "Hello, " <> name <> "!"
+
+
+  notFound :: Response -> Action ()
+  notFound _resp = do
+    setStatus status404
+    sendText $ "See: " <> rhref getRootHtmlR [("q", "404")]
+
+
+  postCaseR :: Route '[] Handler
+  postCaseR = post handle // "case" // "" /? acceptForm
+    where
+      handle = do
+        (res, view) <- postForm "addCase" addCaseForm
+
+        case res of
+          Nothing -> do
+            setStatus status400
+            sendHTML do
+              simpleForm_ view
+
+          Just ac -> do
+            _case <- addCase ac
+            redirect (rhref getCasesR [])
+
+
+  getCasesR :: Route '[] Handler
+  getCasesR = get handle // "case" // "" /? offerHTML
+    where
+      handle = do
+        setHeader hCacheControl "no-store"
+
+        cases <- liftIO . readMVar . modelCases =<< getModelEnv
+
+        sendHTML do
+          h1_ "Cases"
+
+          form_ [method_ "POST"] do
+            view <- newForm "addCase" Nothing addCaseForm
+            simpleForm_ view
+            button_ [type_ "submit"] "Submit"
+
+          table_ do
+            tr_ do
+              th_ "Id"
+              th_ "Name"
+              th_ "RecNo"
+              th_ "Mode"
+              th_ "Active"
+
+            forM cases \Case{..} -> do
+              tr_ do
+                td_ $ toHtml $ tshow caseId
+                td_ $ toHtml $ caseName
+                td_ $ toHtml $ caseRecNo
+                td_ $ toHtml $ tshow caseMode
+                td_ $ toHtml $ tshow caseActive
 
 
   -- Forms -------------------------------------------------------------------

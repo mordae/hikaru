@@ -1,14 +1,14 @@
-{-|
-Module      :  Hikaru
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module re-exports other modules in the package.
--}
+-- |
+-- Module      :  Hikaru
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module re-exports other modules in the package.
+--
 
 module Hikaru
   (

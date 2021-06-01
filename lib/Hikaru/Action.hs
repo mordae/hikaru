@@ -1,15 +1,15 @@
-{-|
-Module      :  Hikaru.Action
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides a monad for reacting to user requests by
-building responses.
--}
+-- |
+-- Module      :  Hikaru.Action
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides a monad for reacting to user requests by
+-- building responses.
+--
 
 module Hikaru.Action
   ( MonadAction(..)
@@ -87,7 +87,8 @@ module Hikaru.Action
   , wsReceive
 
   -- ** Errors
-  , throwError
+  , abort
+  , abortMiddleware
 
   -- ** Localization
   , getLanguages
@@ -167,6 +168,24 @@ where
   -- Allow access to action when building HTML responses.
   --
   instance (MonadAction m) => MonadAction (HtmlT m)
+
+
+  -- |
+  -- Exception raised by 'abort'.
+  --
+  data AbortAction
+    = AbortAction
+      { status         :: Status
+      , headers        :: [Header]
+      , message        :: Text
+      }
+    deriving (Show, Generic)
+
+  instance NFData AbortAction where
+    rnf AbortAction{status = Status{..}, ..} =
+      rnf (statusCode, statusMessage, headers, message)
+
+  instance Exception AbortAction
 
 
   -- |
@@ -522,8 +541,8 @@ where
   --
   -- Returns 'Data.ByteString.empty' once the whole body has been consumed.
   --
-  -- * Throws 'PayloadTooLarge' if reading next chunk would exceed
-  --   the allotted request body limit. See 'setBodyLimit' for more.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
   --
   getBodyChunk :: (MonadAction m) => m ByteString
   getBodyChunk = do
@@ -536,8 +555,8 @@ where
   --
   -- Returns 'Data.ByteString.empty' once the whole body has been consumed.
   --
-  -- * Throws 'PayloadTooLarge' if reading next chunk would exceed
-  --   the allotted request body limit. See 'setBodyLimit' for more.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
   --
   getBodyChunkIO :: (MonadAction m) => m (IO ByteString)
   getBodyChunkIO = do
@@ -555,12 +574,8 @@ where
            return chunk
 
          else do
-           throwLimitIO limit
-
-    where
-      throwLimitIO :: Int64 -> IO a
-      throwLimitIO n = throwIO (PayloadTooLarge, msg :: Text)
-        where msg = "Limit is " <> tshow n <> " bytes."
+           abort requestEntityTooLarge413 []
+                 ("Limit is " <> tshow limit <> " bytes.")
 
 
   -- |
@@ -574,7 +589,8 @@ where
   -- Using this function directly will prevent access to the body in other
   -- ways, such as through the 'getJSON', 'getFields' or 'getFiles'.
   --
-  -- * Reading the body can throw 'PayloadTooLarge'.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
   --
   getBodyRaw :: (MonadAction m) => m LBS.ByteString
   getBodyRaw = do
@@ -595,16 +611,16 @@ where
   -- |
   -- Read, parse, cache and return 'Value' sent by the user.
   --
-  -- * Throws 'UnsupportedMediaType' if the Content-Type does not
+  -- * Aborts with 'unsupportedMediaType415' if 'hContentType' does not
   --   indicate a JSON payload.
   --
-  -- * Throws 'BadRequest' if the payload fails to parse.
+  -- * Aborts with 'badRequest400' if the payload fails to parse.
   --
-  -- * Throws 'PayloadTooLarge' if the payload size limit is exceeded.
-  --   Use 'setBodyLimit' to adjust the limit to your liking.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
   --
-  -- * Throws 'InternalError' is the body has already been consumed
-  --   and was not cached as JSON.
+  -- * Aborts with 'internalServerError500' if the body has already been
+  --   consumed and was not cached as JSON.
   --
   getJSON :: (MonadAction m, FromJSON a) => m a
   getJSON = do
@@ -615,7 +631,7 @@ where
       -- This is ideal, we already have what we need.
       BodyJSON value ->
         case fromJSON value of
-          Data.Aeson.Error err -> throwError BadRequest (cs err)
+          Data.Aeson.Error err -> abort badRequest400 [] (cs err)
           Data.Aeson.Success out -> return out
 
       -- Body has not been parsed yet. This is very good.
@@ -624,7 +640,7 @@ where
 
         if matchMediaList ctype [ "application/json", "text/json" ]
            then return ()
-           else throwError UnsupportedMediaType "Send some JSON!"
+           else abort unsupportedMediaType415 [] "Send some JSON!"
 
         -- Taint and read.
         setActionField aeBody BodyTainted
@@ -632,7 +648,7 @@ where
 
         -- Try to parse.
         value <- case eitherDecode' body of
-                   Left reason -> throwError BadRequest (cs reason)
+                   Left reason -> abort badRequest400 [] (cs reason)
                    Right value -> return value
 
         -- Cache and return.
@@ -640,13 +656,13 @@ where
 
         -- Parse to the output type.
         case fromJSON value of
-          Data.Aeson.Error err -> throwError BadRequest (cs err)
+          Data.Aeson.Error err -> abort badRequest400 [] (cs err)
           Data.Aeson.Success out -> return out
 
       -- Now this is bad. We have already read the body,
       -- but not as a JSON. This is an internal error.
       _else -> do
-        throwError InternalError "Body has been parsed as a non-JSON."
+        abort internalServerError500 [] "Body has been parsed as non-JSON."
 
 
   -- |
@@ -656,13 +672,16 @@ where
   -- uploades them to a temporary location and caches information
   -- about them so that 'getFiles' can return them separately.
   --
-  -- * Throws 'UnsupportedMediaType' if the Content-Type does not
+  -- * Aborts with 'unsupportedMediaType415' if 'hContentType' does not
   --   indicate a form payload.
   --
-  -- * Throws 'BadRequest' if the payload fails to parse.
+  -- * Aborts with 'badRequest400' if the payload fails to parse.
   --
-  -- * Throws 'PayloadTooLarge' if the payload size limit is exceeded.
-  --   Use 'setBodyLimit' to adjust the limit to your liking.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
+  --
+  -- * Aborts with 'internalServerError500' if the body has already been
+  --   consumed and was not cached as form data.
   --
   getFields :: (MonadAction m) => m [(Text, Text)]
   getFields = map cs2 <$> fst <$> getFormData
@@ -722,13 +741,16 @@ where
   -- Backend for both 'getFields' and 'getFiles' that parses,
   -- caches and returns form data.
   --
-  -- * Throws 'UnsupportedMediaType' if the Content-Type does not
+  -- * Aborts with 'unsupportedMediaType415' if 'hContentType' does not
   --   indicate a form payload.
   --
-  -- * Throws 'BadRequest' if the payload fails to parse.
+  -- * Aborts with 'badRequest400' if the payload fails to parse.
   --
-  -- * Throws 'PayloadTooLarge' if the payload size limit is exceeded.
-  --   Use 'setBodyLimit' to adjust the limit to your liking.
+  -- * Aborts with 'requestEntityTooLarge413' if reading next chunk would
+  --   exceed the allotted request body limit. See 'setBodyLimit' for more.
+  --
+  -- * Aborts with 'internalServerError500' if the body has already been
+  --   consumed and was not cached as form data.
   --
   getFormData :: (MonadAction m) => m FormData
   getFormData = do
@@ -744,7 +766,7 @@ where
         getChunk <- getBodyChunkIO
 
         case bodyType of
-          Nothing -> throwError UnsupportedMediaType "Send some form!"
+          Nothing -> abort unsupportedMediaType415 [] "Send some form!"
           Just bt -> do
             -- Prepare for uploaded files finalization.
             rtis <- createInternalState
@@ -764,7 +786,7 @@ where
       -- Now this is bad. We have already read the body,
       -- but not as a form. This is an internal error.
       _else -> do
-        throwError InternalError "Body has been parsed as a non-form."
+        abort internalServerError500 [] "Body has been parsed as non-form."
 
 
   -- |
@@ -810,7 +832,7 @@ where
       -- Now this is bad. We have already read the body,
       -- but not as a raw data. This is an internal error.
       _else -> do
-        throwError InternalError "Body has already been parsed."
+        abort internalServerError500 [] "Body has already been parsed."
 
 
   -- Building Response -------------------------------------------------------
@@ -1107,7 +1129,7 @@ where
             Just resp -> resp
 
       _else -> do
-        throwError InternalError "Body has already been consumed."
+        abort internalServerError500 [] "Body has already been consumed."
 
     where
       app :: WS.PendingConnection -> IO ()
@@ -1167,10 +1189,24 @@ where
 
 
   -- |
-  -- Same an IO exception in the form of ('RequestError', 'Text').
+  -- Raise 'AbortAction' using given status, headers and a textual body.
+  -- Headers are prefixed with ('hContentType', @text/plain@).
   --
-  throwError :: (MonadAction m) => RequestError -> Text -> m a
-  throwError exn msg = throwIO (exn, msg)
+  -- You are supposed to use it together with 'abortMiddleware' that turns
+  -- such exception into regular 'Response's.
+  --
+  abort :: (MonadIO m) => Status -> [Header] -> Text -> m a
+  abort st hdrs msg = throwIO $ AbortAction st hdrs' msg
+    where hdrs' = (hContentType, "text/plain; charset=utf8") : hdrs
+
+
+  -- |
+  -- Catches 'AbortAction' and turns it into a 'Response'.
+  --
+  abortMiddleware :: Middleware
+  abortMiddleware app req sink = do
+    app req sink `catch` \AbortAction{..} -> do
+      sink $ responseLBS status headers (cs message)
 
 
   -- Localization ------------------------------------------------------------

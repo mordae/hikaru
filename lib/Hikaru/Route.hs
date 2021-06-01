@@ -1,396 +1,373 @@
-{-|
-Module      :  Hikaru.Route
-Copyright   :  Jan Hamal Dvořák
-License     :  MIT
-
-Maintainer  :  mordae@anilinux.org
-Stability   :  unstable
-Portability :  non-portable (ghc)
-
-This module provides path matching with parameter extraction
-as well as content negotiation through path quality scoring.
--}
+-- |
+-- Module      :  Hikaru.Route
+-- Copyright   :  Jan Hamal Dvořák
+-- License     :  MIT
+--
+-- Maintainer  :  mordae@anilinux.org
+-- Stability   :  unstable
+-- Portability :  non-portable (ghc)
+--
+-- This module provides means for route construction.
+--
 
 module Hikaru.Route
-  (
-  -- * Route Selection
-    selectRoute
-  , RouteResult(..)
+  ( -- * Path Matching
+    Route
+  , root
+  , (/:)
+  , (//)
+  , (/?)
 
-  -- ** Path Matching
-  , seg
-  , (</)
-  , arg
-  , argWith
-  , rest
-
-  -- ** Route Scoring
-  , vary
-  , score
+    -- * Route Scoring
+  , Appraisal(..)
   , Score(..)
 
-  -- *** Method
+    -- ** Method (HTTP Verb)
   , method
   , get
   , post
-  , head
-  , put
-  , patch
-  , delete
 
-  -- *** WebSockets
+    -- ** WebSockets
+  , requireWebsocket
   , websocket
 
-  -- *** Request Content
+    -- ** Request Content
   , acceptContent
   , acceptForm
   , acceptJSON
 
-  -- *** Response Content
+    -- ** Response Content
   , offerContent
   , offerHTML
   , offerText
   , offerJSON
-  , offerCharset
   , offerEncoding
   , offerLanguage
 
-  -- ** Types
-  , Route
+    -- * Applying Routes
+  , routePath
+  , PathInfo(..)
+  , routeLink
+  , routeLinkHVect
+  , routeApply
+  , routeScore
+  , routeVary
   )
 where
-  import Praha
-
-  import Data.List (lookup, map)
+  import Praha hiding (curry)
   import Hikaru.Media
   import Hikaru.Types
+
   import Network.HTTP.Types.Header
-  import Network.HTTP.Types.Method (Method)
   import Network.Wai
   import Network.Wai.Handler.WebSockets
 
+  import Data.List (reverse, nub, lookup)
+  import Data.Typeable (TypeRep, typeRep)
+
+  import Data.HVect hiding (reverse)
+
 
   -- |
-  -- 'Applicative' used to associate a handler with conditions,
-  -- upon which to invoke it.
+  -- Route combines path description with a handler that gets saturated
+  -- with captured path components.
   --
-  -- Frequent conditions include HTTP method and path matching,
-  -- but can also include an arbitrary 'Request' inspection
+  -- Just make a path like this:
   --
-  newtype Route a
+  -- @
+  -- getHelloR :: 'Route' \'[Text, Text] Text
+  -- getHelloR = 'get' handler '//' \"hello\" '/:' \"greeting\" '/:' \"name\"
+  --   where handler greeting name = mconcat [ greeting, \", \", name, \"!\" ]
+  -- @
+  --
+  -- And then apply it to a list of path components, like that:
+  --
+  -- >>> routeApply ["hello", "What a nice day", "dear Reader"] getHelloR
+  -- Just "What a nice day, dear Reader!"
+  --
+  -- Or construct a link to it with 'routeLink':
+  --
+  -- >>> href getHelloR "Ahoy" "Sailor"
+  -- ["hello", "Ahoy", Sailor"]
+  --
+  -- Or better yet, use 'Hikaru.Dispatch.dispatch' to select the best
+  -- route to handle a 'Request'.
+  --
+  data Route ts a
     = Route
-      { runRoute       :: Env -> (Env, Maybe a)
+      { path           :: [PathInfo]
+      , func           :: [Text] -> Maybe a
+      , score          :: [Request -> Score]
+      , vary           :: [HeaderName]
       }
+    deriving (Generic)
 
-  instance Functor Route where
-    fmap f r = Route \env -> fmap (fmap f) (runRoute r env)
-    {-# INLINE fmap #-}
+  instance NFData (Route ts a)
 
-  instance Applicative Route where
-    pure x = Route \env -> (env, Just x)
-    {-# INLINE pure #-}
 
-    (<*>) rf rx = Route \env ->
-      case runRoute rf env of
-        (env', Just f)  -> runRoute (fmap f rx) env'
-        (env', Nothing) -> case runRoute rx env' of
-                             (env'', _) -> (env'', Nothing)
-    {-# INLINE (<*>) #-}
+  data PathInfo
+    = Segment Text
+      -- ^ Path segment to be matched.
+    | Capture Text TypeRep
+      -- ^ Path segment to be captured.
+    deriving (Show, Eq, Generic)
+
+  instance NFData PathInfo
 
 
   -- |
-  -- Internal 'Route' environment.
+  -- Indicates suitability as well as quality of a route.
   --
-  data Env
-    = Env
-      { envPath        :: [Text]
-        -- ^ Remaining path segments to consume during matching.
-
-      , envScoring     :: [Request -> Score]
-        -- ^ Registered scoring functions to select the best handler.
-
-      , envVary        :: [HeaderName]
-        -- ^ List of headers used to score this route.
-      }
-
-
-  -- |
-  -- Route scoring result.
-  --
-  -- Scores are ordered in the descending order of preference.
-  --
-  -- Route matching results in the worst result encountered in the route.
-  -- Dispatcher then selects the route with the best score overall.
-  -- Best match does not necessarily mean a successfull one, though.
+  -- Scores form a monoid, added together the smaller one wins.
+  -- When two Suitable ones are added, their quality gets multiplied.
+  -- Since the default quality is 1.0 and quality (when negotiating content)
+  -- should be in the \((0.0, 1.0]\) range, this helps to select appropriate
+  -- route across multiple appraisals.
   --
   data Score
-    = Suitable !Float
-    | Unsuitable !RequestError Text
-    deriving (Eq, Ord)
+    = BadRequest
+    | NotFound
+    | MethodNotAllowed
+    | UpgradeRequired
+    | NotAcceptable
+    | LengthRequired
+    | UnsupportedMediaType
+    | Suitable Float
+      -- ^ Suitable routes have quality.
+    deriving (Show, Eq, Ord, Generic)
 
+  instance NFData Score
 
-  -- |
-  -- Concatenating two scores produces the worse one.
-  -- If both are suitable, the quality is multiplied.
-  --
   instance Semigroup Score where
     (Suitable x) <> (Suitable y) = Suitable (x * y)
-    x <> y = max x y
-    {-# INLINE (<>) #-}
+    x <> y = min x y
 
-  -- |
-  -- Results form a monoid with 'Suitable' as the neutral element.
-  --
   instance Monoid Score where
     mempty = Suitable 1.0
-    {-# INLINE mempty #-}
 
 
   -- |
-  -- Result of a route matching.
+  -- Appraisal of a route to decide whether it's suitable for a 'Request'
+  -- or not.
   --
-  -- * 'RequestError' is used to indicate the reason of failure.
+  -- Some appraisals (especially those for content negotiation) inspect
+  -- request headers. HTTP spec mandates that any 'Response' that serves
+  -- different content based on headers (e.g. in a different language) to
+  -- always include a @Vary@ header with names of all headers used in this
+  -- manner. You can get the list for a route using 'routeVary'.
   --
-  -- * Successfull value is annotated with headers used to select it
-  --   and the final quality. You should send them to the user using
-  --   the @Vary@ header.
+  -- You should mention those headers when designing your own appraisals,
+  -- by the way.
   --
-  data RouteResult a
-    = RouteFailed
-      { rresError      :: RequestError
-      , rresMessage    :: Text
-      , rresVary       :: [HeaderName]
+  data Appraisal
+    = Appraisal
+      { score          :: Request -> Score
+      , vary           :: [HeaderName]
       }
-    | RouteSuccess
-      { rresAction     :: a
-      , rresQuality    :: Float
-      , rresVary       :: [HeaderName]
-      }
+    deriving (Generic)
+
+  instance NFData Appraisal
+
+
+  type family RouteElim (r :: Type) (ts :: [Type]) where
+    RouteElim r (t ': ts) = t -> RouteElim r ts
+    RouteElim r '[]       = r
+
+
+  infixl 4 /:
 
   -- |
-  -- It forms a semigroup that selects the best result overall.
+  -- Extends the route with a captured component that gets automatically
+  -- converted using 'fromParam' behind the scenes when saturating
+  -- the handler.
   --
-  instance Semigroup (RouteResult a) where
-    x@(RouteSuccess _ g _) <> y@(RouteSuccess  _ h _) = if g >= h then x else y
-    x@(RouteSuccess _ _ _) <> (  RouteFailed  _ _ _) = x
-    (  RouteFailed  _ _ _) <> y@(RouteSuccess _ _ _) = y
-    x@(RouteFailed  g _ _) <> y@(RouteFailed  h _ _) = if g >= h then x else y
-
-
-  -- |
-  -- Given a list of available routes and a 'Request'
-  -- return the action to take or give a reason for failure.
+  -- The 'Text' argument itself can be obtained using 'routePath' later,
+  -- when you want to introspect the route for some reason. It serves no
+  -- other purpose.
   --
-  selectRoute :: [Route a] -> Request -> RouteResult a
-  selectRoute rs req = choosePath req $ mapMaybe bind rs
-    where bind = flip bindPath (pathInfo req)
-
-
-  -- |
-  -- Map action to path components.
-  --
-  bindPath :: Route a -> [Text] -> Maybe (Request -> RouteResult a)
-  bindPath rt p = case runRoute (rt <* end) (Env p [] []) of
-                    (_,   Nothing) -> Nothing
-                    (env, Just x)  -> Just (scoreResult env x)
-
-
-  -- |
-  -- Score the mapped action with respect to the request.
-  --
-  scoreResult :: Env -> a -> Request -> RouteResult a
-  scoreResult Env{..} x req =
-    case mconcat (map (req &) envScoring) of
-      Unsuitable exn msg -> RouteFailed exn msg envVary
-      Suitable   score'  -> if score' <= 0.0
-                               then RouteFailed NotAcceptable "" envVary
-                               else RouteSuccess x score' envVary
-
-
-  -- |
-  -- Select the best route with respect to the request.
-  --
-  choosePath :: Request -> [Request -> RouteResult a] -> RouteResult a
-  choosePath req = choose . map ($ req)
+  (/:) :: forall ts a b. (Param a, Typeable a)
+       => Route ts (a -> b) -> Text -> Route (Reverse (a ': Reverse ts)) b
+  (/:) r@Route{..} name = r { path = capture : path
+                            , func = apply
+                            }
     where
-      choose :: [RouteResult a] -> RouteResult a
-      choose []     = RouteFailed NotFound "" []
-      choose (r:rs) = sconcat (r :| rs)
+      capture = Capture name (typeRep proxy)
+      proxy   = Proxy :: Proxy a
+
+      apply (this:rest) = func rest <*> fromParam this
+      apply _otherwise  = Nothing
 
 
-  -- Path Matching -----------------------------------------------------------
+  infixl 4 //
+
+  -- |
+  -- Extends the route with a matched component.
+  --
+  (//) :: Route ts a -> Text -> Route ts a
+  (//) r@Route{..} seg = r { path = Segment seg : path
+                           , func = apply
+                           }
+    where
+      apply (this:rest) = if this == seg then func rest else Nothing
+      apply _otherwise  = Nothing
+
+
+  infixl 4 /?
 
 
   -- |
-  -- Match and return following path segment.
+  -- Extends the route with an appraisal. That is, an additional condition
+  -- (apart from path) that the route must satisfy in order to be used when
+  -- dispatching or with 'routeScore'.
   --
-  -- Fails with 'NotFound' if the segment is missing or different.
-  --
-  seg :: Text -> Route Text
-  seg s = argWith \t -> if s == t
-                           then Just t
-                           else Nothing
+  (/?) :: Route ts a -> Appraisal -> Route ts a
+  (/?) r@Route{..} Appraisal{score = score', vary = vary'} =
+    r { vary  = nub (vary' <> vary)
+      , score = score' : score
+      }
 
 
   -- |
-  -- Shortcut to append a path segment in a more readable way.
+  -- Ties an empty path to an unsaturated handler.
   --
-  (</) :: Route a -> Text -> Route a
-  (</) r t = r <* seg t
+  root :: handler -> Route '[] handler
+  root x = Route { path  = []
+                 , score = []
+                 , vary  = []
+                 , func  = \case
+                             []    -> Just x
+                             _else -> Nothing
+                 }
 
 
   -- |
-  -- Match, parse and return following path segment.
+  -- Check that the request used given HTTP verb.
   --
-  -- Fails with 'NotFound' if the segment is missing or unparseable.
-  --
-  arg :: (Param a) => Route a
-  arg = argWith fromParam
+  method :: ByteString -> Appraisal
+  method verb = Appraisal {vary = [], score}
+    where
+      score req = if requestMethod req == verb
+                     then Suitable 1.0
+                     else MethodNotAllowed
 
 
   -- |
-  -- Match, parse and return next path segment using the supplied function.
+  -- Combines 'root' with 'method' for the most common case.
   --
-  -- Fails with 'NotFound' if the segment is missing.
-  -- Otherwise respects the result of the matcher function.
-  --
-  argWith :: (Text -> Maybe a) -> Route a
-  argWith match =
-    Route \env@Env{..} ->
-      case envPath of
-        []     -> (env, Nothing)
-        (x:xs) -> (env { envPath = xs }, match x)
+  get :: handler -> Route '[] handler
+  get fn = root fn /? method "GET"
 
 
   -- |
-  -- Match and return all remaining path segments.
+  -- Combines 'root' with 'method' for the second most common case.
   --
-  rest :: Route [Text]
-  rest = Route \env@Env{..} -> (env { envPath = [] }, Just envPath)
+  post :: handler -> Route '[] handler
+  post fn = root fn /? method "POST"
 
 
   -- |
-  -- Match end of the path (i.e. no remaining segments).
-  -- Used to ensure that the path has been exhausted.
+  -- Check that the request wants to perform an upgrade to WebSocket.
   --
-  -- Fails with 'NotFound' if more segments are remaining.
+  -- Varies with 'hUpgrade'.
   --
-  end :: Route ()
-  end = Route \env@Env{..} ->
-    case envPath of
-      [] -> (env, Just ())
-      _  -> (env, Nothing)
+  requireWebsocket :: Appraisal
+  requireWebsocket = Appraisal {vary = [hUpgrade], score}
+    where
+      score req = if isWebSocketsReq req
+                     then Suitable 1.0
+                     else UpgradeRequired
 
 
   -- |
-  -- Score route with respect to the request using the supplied function.
+  -- Combines 'root' with 'requireWebsocket' for a common case.
   --
-  score :: (Request -> Score) -> Route ()
-  score fn =
-    Route \env@Env{..} ->
-      (env { envScoring = fn : envScoring }, Just ())
+  websocket :: a -> Route '[] a
+  websocket fn = root fn /? requireWebsocket
 
 
   -- |
-  -- Add list of headers that have been inspected in order to
-  -- select proper response format.
+  -- Return information about matched and captured path components
+  -- for given route. Might come in handy for automated API docs.
   --
-  -- This is needed to ensure our responses are cached properly by any
-  -- proxies along the way, but you only need to use this function if
-  -- your action performs some kind of additional content negotiation.
-  -- All the scoring functions in this module do this automatically.
-  --
-  vary :: [HeaderName] -> Route ()
-  vary hs =
-    Route \env@Env{..} ->
-      (env { envVary = hs <> envVary }, Just ())
-
-
-  -- Methods -----------------------------------------------------------------
+  routePath :: Route ts a -> [PathInfo]
+  routePath Route{path} = reverse path
 
 
   -- |
-  -- Match a particular HTTP method.
+  -- Apply route to a path, ideally resulting in a saturated handler.
   --
-  -- Fails with 'MethodNotAllowed' if a different method was used.
-  --
-  method :: Method -> Route ()
-  method meth = score \req ->
-    if meth == requestMethod req
-       then Suitable 1.0
-       else Unsuitable MethodNotAllowed ""
+  routeApply :: [Text] -> Route ts a -> Maybe a
+  routeApply xs Route{func} = func (reverse xs)
 
 
   -- |
-  -- Same as 'method' with the @GET@ argument.
+  -- Score route for given 'Request'.
   --
-  get :: Route ()
-  get = method "GET"
+  routeScore :: Request -> Route ts a -> Score
+  routeScore req Route{score} = mconcat $ fmap ($ req) score
 
 
   -- |
-  -- Same as 'method' with the @POST@ argument.
+  -- Get list of all headers 'routeScore' would use.
   --
-  post :: Route ()
-  post = method "POST"
+  routeVary :: Route ts a -> [HeaderName]
+  routeVary Route{vary} = vary
 
 
   -- |
-  -- Same as 'method' with the @HEAD@ argument.
+  -- Construct link for the given route using supplied values of captured
+  -- path components. Useful to create hrefs and form actions.
   --
-  head :: Route ()
-  head = method "HEAD"
+  routeLink :: forall ts a. (HasRep ts, AllHave Param ts)
+            => Route ts a -> HVectElim ts [Text]
+  routeLink route = curry (routeLinkHVect route)
 
 
   -- |
-  -- Same as 'method' with the @PUT@ argument.
+  -- Same as 'routeLink', but operates on a heterogenous vector instead.
+  -- Useful to create your own 'routeLink'-like functions.
+  -- See 'curry' for more.
   --
-  put :: Route ()
-  put = method "PUT"
+  routeLinkHVect :: forall ts a. (AllHave Param ts)
+                 => Route ts a -> HVect ts -> [Text]
+  routeLinkHVect Route{path} = buildPath (reverse path)
 
 
-  -- |
-  -- Same as 'method' with the @PATCH@ argument.
-  --
-  patch :: Route ()
-  patch = method "PATCH"
-
-
-  -- |
-  -- Same as 'method' with the @DELETE@ argument.
-  --
-  delete :: Route ()
-  delete = method "DELETE"
-
-
-  -- |
-  -- Match a WebSocket upgrade request.
-  --
-  websocket :: Route ()
-  websocket = score \req ->
-    if isWebSocketsReq req
-       then Suitable 1.0
-       else Unsuitable BadRequest "WebSocket Upgrade Expected"
+  buildPath :: forall ts. (AllHave Param ts)
+             => [PathInfo] -> HVect ts -> [Text]
+  buildPath [] _ = []
+  buildPath (Segment seg : more) xs = seg : buildPath more xs
+  buildPath (Capture _ _ : more) (x :&: xs) = toParam x : buildPath more xs
+  buildPath _ HNil = error "BUG: buildPath ran out of captures"
 
 
   -- |
   -- Check that the content sent by the client is among the listed
   -- media types and fail with 'UnsupportedMediaType' if not.
-  -- Adds @Vary: Content-Type@.
   --
-  acceptContent :: [Media] -> Route ()
-  acceptContent media =
-    vary [hContentType] <* score \req ->
-      let header = parseMedia (cs $ getContentType req)
-       in case selectMedia media header of
-            Nothing -> Unsuitable UnsupportedMediaType ""
-            Just md -> Suitable (mediaQuality md)
+  -- Varies with 'hContentType'.
+  --
+  acceptContent :: [Media] -> Appraisal
+  acceptContent media = Appraisal {vary = [hContentType], score}
+    where
+      score req = do
+        let header = parseMedia (cs $ getContentType req)
+
+        case selectMedia media header of
+          Just Media{..} -> Suitable quality
+          Nothing        -> UnsupportedMediaType
 
 
   -- |
   -- Shortcut to accept only form submissions.
   --
-  acceptForm :: Route ()
+  -- @
+  -- acceptForm = acceptContent [ \"application/x-www-form-urlencoded\"
+  --                            , \"multipart/form-data\"
+  --                            ]
+  -- @
+  --
+  acceptForm :: Appraisal
   acceptForm = acceptContent [ "application/x-www-form-urlencoded"
                              , "multipart/form-data"
                              ]
@@ -399,7 +376,13 @@ where
   -- |
   -- Shortcut to accept only JSON documents.
   --
-  acceptJSON :: Route ()
+  -- @
+  -- acceptJSON = acceptContent [ \"application/json\"
+  --                            , \"text/json\"
+  --                            ]
+  -- @
+  --
+  acceptJSON :: Appraisal
   acceptJSON = acceptContent [ "application/json"
                              , "text/json"
                              ]
@@ -407,76 +390,86 @@ where
 
   -- |
   -- Check that we can send an acceptable response to the client and
-  -- fail with 'NotAcceptable' if not. Add @Vary: Accept@.
+  -- fail with 'NotAcceptable' if not.
   --
-  offerContent :: [Media] -> Route ()
-  offerContent media =
-    vary [hAccept] <* score \req ->
-      let header = parseMedia (cs $ getAccept req)
-       in case selectMedia media header of
-            Nothing -> Unsuitable NotAcceptable ""
-            Just md -> Suitable (mediaQuality md)
+  -- Varies with 'hAccept'.
+  --
+  offerContent :: [Media] -> Appraisal
+  offerContent media = Appraisal {vary = [hAccept], score}
+    where
+      score req = do
+        let header = parseMedia (cs $ getAccept req)
+
+        case selectMedia media header of
+          Just Media{..} -> Suitable quality
+          Nothing        -> NotAcceptable
 
 
   -- |
   -- Shortcut to offer HTML replies only.
   --
-  offerHTML :: Route ()
+  -- @
+  -- offerHTML = offerContent [\"text/html\"]
+  -- @
+  --
+  offerHTML :: Appraisal
   offerHTML = offerContent ["text/html"]
 
 
   -- |
   -- Shortcut to offer plain text replies only.
   --
-  offerText :: Route ()
+  -- @
+  -- offerText = offerContent [\"text/plain\"]
+  -- @
+  --
+  offerText :: Appraisal
   offerText = offerContent ["text/plain"]
 
 
   -- |
   -- Shortcut to offer JSON replies only.
   --
-  offerJSON :: Route ()
+  -- @
+  -- offerJSON = offerContent [\"application/json\"]
+  -- @
+  --
+  offerJSON :: Appraisal
   offerJSON = offerContent ["application/json"]
 
 
   -- |
-  -- Check that we can send an acceptable charset to the client and
-  -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Charset@.
-  --
-  offerCharset :: [Media] -> Route ()
-  offerCharset media =
-    vary [hAcceptCharset] <* score \req ->
-      let header = parseMedia (cs $ getAcceptCharset req)
-       in case selectMedia media header of
-            Nothing -> Unsuitable NotAcceptable ""
-            Just md -> Suitable (mediaQuality md)
-
-
-  -- |
   -- Check that we can send an acceptable encoding to the client and
-  -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Encoding@.
+  -- fail with 'NotAcceptable' if not.
   --
-  offerEncoding :: [Media] -> Route ()
-  offerEncoding media =
-    vary [hAcceptEncoding] <* score \req ->
-      let header = parseMedia (cs $ getAcceptEncoding req)
-       in case selectMedia media header of
-            Nothing -> Unsuitable NotAcceptable ""
-            Just md -> Suitable (mediaQuality md)
+  -- Varies with 'hAcceptEncoding'.
+  --
+  offerEncoding :: [Media] -> Appraisal
+  offerEncoding media = Appraisal {vary = [hAcceptEncoding], score}
+    where
+      score req = do
+        let header = parseMedia (cs $ getAcceptEncoding req)
+
+        case selectMedia media header of
+          Just Media{..} -> Suitable quality
+          Nothing        -> NotAcceptable
 
 
   -- |
   -- Check that we can send an acceptable language to the client and
-  -- fail with 'NotAcceptable' if not. Add @Vary: Accept-Language@.
+  -- fail with 'NotAcceptable' if not.
   --
-  offerLanguage :: [Media] -> Route ()
-  offerLanguage media =
-    vary [hAcceptLanguage] <* score \req ->
-      let header = parseMedia (cs $ getAcceptLanguage req)
-       in case selectMedia media header of
-            Nothing -> Unsuitable NotAcceptable ""
-            Just md -> Suitable (mediaQuality md)
+  -- Varies with 'hAcceptLanguage'.
+  --
+  offerLanguage :: [Media] -> Appraisal
+  offerLanguage media = Appraisal {vary = [hAcceptLanguage], score}
+    where
+      score req = do
+        let header = parseMedia (cs $ getAcceptLanguage req)
 
+        case selectMedia media header of
+          Just Media{..} -> Suitable quality
+          Nothing        -> NotAcceptable
 
 
   -- Request Utilities -------------------------------------------------------
@@ -493,13 +486,6 @@ where
   --
   getAccept :: Request -> ByteString
   getAccept = fromMaybe "*/*" . getHeader hAccept
-
-
-  -- |
-  -- Obtain the Accept-Charset header value or the default value of \"*\".
-  --
-  getAcceptCharset :: Request -> ByteString
-  getAcceptCharset = fromMaybe "*" . getHeader hAcceptCharset
 
 
   -- |

@@ -148,8 +148,7 @@ where
       }
     deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
-  instance (MonadAction m) => MonadAction (WidgetT m) where
-    getActionEnv = lift getActionEnv
+  instance (MonadAction m) => MonadAction (WidgetT m)
 
 
   -- |
