@@ -25,13 +25,12 @@ module Hikaru.Media
   , selectMedia
   )
 where
-  import Praha hiding (many)
-
-  import Data.Text (toLower)
+  import Praha
 
   import Data.List (filter, lookup, sortOn)
-  import Text.ParserCombinators.ReadP
-  import Data.Char (isControl, isSpace)
+
+  import Data.Char
+  import Data.Attoparsec.Text
 
 
   -- |
@@ -57,13 +56,13 @@ where
   --
   instance IsString Media where
     fromString str = case parseMedia (cs str) of
-                       m:_   -> m
-                       _else -> error $ "Failed to parse media " <> show str
+                       Left reason -> error reason
+                       Right []    -> error "no media given"
+                       Right (m:_) -> m
 
 
   -- |
   -- Try to parse a comma-separated media type list.
-  -- Media that fail to parse are simply omitted.
   --
   -- Example:
   --
@@ -72,24 +71,21 @@ where
   -- , Media { mainType = "text", subType = "plain", quality = 0.7, params = [] }
   -- ]
   --
-  parseMedia :: Text -> [Media]
-  parseMedia text = case readP_to_S pMediaList (cs (toLower text)) of
-                      (m, ""):_ -> sortOn (negate . quality) m
-                      _else     -> []
+  parseMedia :: Text -> Either String [Media]
+  parseMedia = parseOnly (pMediaList <* endOfInput)
 
 
   -- |
   -- Parser for the media list coded mostly to the RFC 2045.
-  -- Input is always lowercased and unicode is accepted.
   --
-  pMediaList :: ReadP [Media]
-  pMediaList = sepBy pMedia pSeparator <* eof
+  pMediaList :: Parser [Media]
+  pMediaList = pMedia `sepBy` pSeparator
     where
+      pMedia :: Parser Media
       pMedia = do
-        mainType <- cs <$> pToken
-        _        <- char '/'
-        subType  <- cs <$> pToken
-        params   <- many pParameter
+        mainType <- pToken
+        subType  <- (char '/' *> pToken) <|> string ""
+        params   <- many' pParameter
 
         let quality = fromMaybe 1.0 do
                         q <- lookup "q" params
@@ -97,24 +93,42 @@ where
 
         return Media{..}
 
+      pParameter :: Parser (Text, Text)
       pParameter = do
         _     <- pSpaced $ char ';'
-        name  <- cs <$> pToken
+        name  <- pToken
         _     <- pSpaced $ char '='
-        value <- cs <$> pValue
+        value <- pValue
         return (name, value)
 
+      pToken :: Parser Text
+      pToken = do
+        pSpaced $ takeTill isSpecial
+
+      pSeparator :: Parser Char
       pSeparator = pSpaced $ char ','
-      pToken     = pSpaced $ many1 (satisfy (not . quote))
-      pValue     = pToken <++ pQuotedStr
-      pQuotedStr = pSpaced $ pQuoted $ many (pExcept '\\')
 
-      pExcept c  = satisfy (c /=)
-      pSpaced p  = skipSpaces *> p <* skipSpaces
-      pQuoted p  = char '"' *> p <* char '"'
+      pValue :: Parser Text
+      pValue = pToken <|> pQuotedStr
 
-      quote c    = isControl c || isSpace c || c `elem` specials
-      specials   = "()<>@,;:\\\"/[]?=" :: [Char]
+      pQuotedStr :: Parser Text
+      pQuotedStr = pSpaced $ pQuoted $ takeTill (== '\\')
+
+      pSpaced :: Parser a -> Parser a
+      pSpaced p = skipSpace *> p <* skipSpace
+
+      pQuoted :: Parser a -> Parser a
+      pQuoted p = char '"' *> p <* char '"'
+
+      isSpecial :: (Char -> Bool)
+      isSpecial c = isControl c || isSpace c
+                    || c == '(' || c == ')'
+                    || c == '<' || c == '>'
+                    || c == '@' || c == ',' || c == ';'
+                    || c == ':' || c == '\\'
+                    || c == '"' || c == '/'
+                    || c == '[' || c == ']'
+                    || c == '?' || c == '='
 
 
   -- |

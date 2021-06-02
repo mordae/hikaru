@@ -361,49 +361,76 @@ where
 
 
   -- |
-  -- Obtain the Accept header value or the default value of @\"*/*\"@.
+  -- Obtain the 'hAccept' header value or the default value of @\"*/*\"@.
+  --
+  -- Aborts with 'badRequest400' if the header fails to parse.
   --
   getAccept :: (MonadAction m) => m [Media]
-  getAccept = parseMedia <$> cs . fromMaybe "*/*"
-                         <$> getHeaderMaybe hAccept
+  getAccept = do
+    value <- getHeaderDefault hAccept "*/*"
+
+    case parseMedia (cs value) of
+      Left _reason -> abort badRequest400 [] "Failed to parse Accept."
+      Right media  -> return media
 
 
   -- |
   -- Obtain the Accept-Charset header value or the default value of @\"*\"@.
   --
+  -- Aborts with 'badRequest400' if the header fails to parse.
+  --
   getAcceptCharset :: (MonadAction m) => m [Media]
-  getAcceptCharset = parseMedia <$> cs . fromMaybe "*"
-                                <$> getHeaderMaybe hAcceptCharset
+  getAcceptCharset = do
+    value <- getHeaderDefault hAcceptCharset "*"
+
+    case parseMedia (cs value) of
+      Left _reason -> abort badRequest400 [] "Failed to parse Accept-Charset."
+      Right media  -> return media
 
 
   -- |
   -- Obtain the Accept-Encoding header value or the default
   -- value of @\"identity,*;q=0\"@.
   --
+  -- Aborts with 'badRequest400' if the header fails to parse.
+  --
   getAcceptEncoding :: (MonadAction m) => m [Media]
-  getAcceptEncoding = parseMedia <$> cs . fromMaybe "identity,*;q=0"
-                                 <$> getHeaderMaybe hAcceptEncoding
+  getAcceptEncoding = do
+    value <- getHeaderDefault hAcceptEncoding "identity,*;q=0"
+
+    case parseMedia (cs value) of
+      Left _reason -> abort badRequest400 [] "Failed to parse Accept-Encoding."
+      Right media  -> return media
 
 
   -- |
   -- Obtain the Accept-Language header value or the default value of @\"*\"@.
   --
+  -- Aborts with 'badRequest400' if the header fails to parse.
+  --
   getAcceptLanguage :: (MonadAction m) => m [Media]
-  getAcceptLanguage = parseMedia <$> cs . fromMaybe "*/*"
-                                 <$> getHeaderMaybe hAcceptLanguage
+  getAcceptLanguage = do
+    value <- getHeaderDefault hAcceptLanguage "*"
+
+    case parseMedia (cs value) of
+      Left _reason -> abort badRequest400 [] "Failed to parse Accept-Language."
+      Right media  -> return media
 
 
   -- |
   -- Obtain the Content-Type header value or the default value of
   -- @\"application/octet-stream\"@ (always true, but meaningless).
   --
+  -- Aborts with 'badRequest400' if the header fails to parse.
+  --
   getContentType :: (MonadAction m) => m Media
   getContentType = do
-    media <- fmap parseMedia <$> fmap cs <$> getHeaderMaybe hContentType
+    value <- getHeaderDefault hContentType "application/octet-stream"
 
-    case media of
-      Just (x:_) -> return x
-      _else      -> return "application/octet-stream"
+    case parseMedia (cs value) of
+      Left _reason -> abort badRequest400 [] "Failed to parse Content-Type."
+      Right []     -> abort badRequest400 [] "Empty Content-Type."
+      Right (m:_)  -> return m
 
 
   -- |

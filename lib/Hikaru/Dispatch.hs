@@ -138,21 +138,24 @@ where
 
 
   err :: Score -> Application
-  err BadRequest           = respond status400
-  err NotFound             = respond status404
-  err MethodNotAllowed     = respond status405
-  err UpgradeRequired      = respond status426
-  err NotAcceptable        = respond status406
-  err LengthRequired       = respond status411
-  err UnsupportedMediaType = respond status415
+  err (BadRequest reason)  = respond status400 (Just reason)
+  err NotFound             = respond status404 Nothing
+  err MethodNotAllowed     = respond status405 Nothing
+  err UpgradeRequired      = respond status426 Nothing
+  err NotAcceptable        = respond status406 Nothing
+  err LengthRequired       = respond status411 Nothing
+  err UnsupportedMediaType = respond status415 Nothing
   err (Suitable _)         = error "BUG: errored out with a Suitable"
 
 
-  respond :: Status -> Application
-  respond st@Status{..} _ sink = sink $ responseLBS st hdr msg
+  respond :: Status -> Maybe Text -> Application
+  respond st@Status{..} msg _ sink = sink $ responseLBS st hdr msg'
     where
-      hdr = [(hContentType, "text/plain")]
-      msg = cs (show statusCode) <> " " <> cs statusMessage
+      hdr  = [(hContentType, "text/plain")]
+
+      msg' = case msg of
+               Nothing -> cs (show statusCode) <> " " <> cs statusMessage
+               Just m  -> cs m
 
 
   handlerMW :: (h -> Application) -> [(Int, Response -> h)] -> Middleware

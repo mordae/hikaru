@@ -125,7 +125,7 @@ where
   -- route across multiple appraisals.
   --
   data Score
-    = BadRequest
+    = BadRequest Text
     | NotFound
     | MethodNotAllowed
     | UpgradeRequired
@@ -351,11 +351,11 @@ where
   acceptContent media = Appraisal {vary = [hContentType], score}
     where
       score req = do
-        let header = parseMedia (cs $ getContentType req)
-
-        case selectMedia media header of
-          Just Media{..} -> Suitable quality
-          Nothing        -> UnsupportedMediaType
+        case parseMedia (cs $ getContentType req) of
+          Left _reason -> BadRequest "Failed to parse Content-Type."
+          Right header -> case selectMedia media header of
+                            Just Media{..} -> Suitable quality
+                            Nothing        -> UnsupportedMediaType
 
 
   -- |
@@ -398,11 +398,11 @@ where
   offerContent media = Appraisal {vary = [hAccept], score}
     where
       score req = do
-        let header = parseMedia (cs $ getAccept req)
-
-        case selectMedia media header of
-          Just Media{..} -> Suitable quality
-          Nothing        -> NotAcceptable
+        case parseMedia (cs $ getAccept req) of
+          Left _reason -> BadRequest "Failed to parse Accept."
+          Right header -> case selectMedia media header of
+                            Just Media{..} -> Suitable quality
+                            Nothing        -> NotAcceptable
 
 
   -- |
@@ -448,11 +448,11 @@ where
   offerEncoding media = Appraisal {vary = [hAcceptEncoding], score}
     where
       score req = do
-        let header = parseMedia (cs $ getAcceptEncoding req)
-
-        case selectMedia media header of
-          Just Media{..} -> Suitable quality
-          Nothing        -> NotAcceptable
+        case parseMedia (cs $ getAcceptEncoding req) of
+          Left _reason -> BadRequest "Failed to parse Accept-Encoding."
+          Right header -> case selectMedia media header of
+                            Just Media{..} -> Suitable quality
+                            Nothing        -> NotAcceptable
 
 
   -- |
@@ -465,11 +465,11 @@ where
   offerLanguage media = Appraisal {vary = [hAcceptLanguage], score}
     where
       score req = do
-        let header = parseMedia (cs $ getAcceptLanguage req)
-
-        case selectMedia media header of
-          Just Media{..} -> Suitable quality
-          Nothing        -> NotAcceptable
+        case parseMedia (cs $ getAcceptLanguage req) of
+          Left _reason -> BadRequest "Failed to parse Accept-Language."
+          Right header -> case selectMedia media header of
+                            Just Media{..} -> Suitable quality
+                            Nothing        -> NotAcceptable
 
 
   -- Request Utilities -------------------------------------------------------
