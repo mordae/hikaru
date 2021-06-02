@@ -23,6 +23,16 @@ module Hikaru
   , module Hikaru.Media
   , module Hikaru.Route
   , module Hikaru.Types
+
+  -- * Re-exported from "Network.Wai":
+  , Application
+  , Middleware
+  , Request
+  , Response
+
+  -- * Re-exported from "Network.HTTP.Types":
+  , Status
+  , Header
   )
 where
   import Hikaru.Action
@@ -35,6 +45,9 @@ where
   import Hikaru.Media
   import Hikaru.Route
   import Hikaru.Types
+
+  import Network.Wai
+  import Network.HTTP.Types
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
