@@ -41,10 +41,10 @@ where
   --
   data Media
     = Media
-      { mainType       :: Text
-      , subType        :: Text
+      { mainType       :: !Text
+      , subType        :: !Text
       , params         :: [(Text, Text)]
-      , quality        :: Float
+      , quality        :: !Float
       }
     deriving (Show, Eq, Ord, Generic)
 

@@ -175,9 +175,9 @@ where
   --
   data AbortAction
     = AbortAction
-      { status         :: Status
+      { status         :: !Status
       , headers        :: [Header]
-      , message        :: Text
+      , message        :: !Text
       }
     deriving (Show, Generic)
 
@@ -222,17 +222,17 @@ where
   data ActionEnv
     = ActionEnv
       { aeRequest      :: Request
-      , aeBody         :: IORef RequestBody
-      , aeRespStatus   :: IORef Status
-      , aeRespHeaders  :: IORef ResponseHeaders
-      , aeRespMaker    :: IORef ResponseMaker
-      , aeFinalize     :: IORef (IO ())
-      , aeBodyLimit    :: IORef Int64
-      , aeBodyCounter  :: IORef Int64
-      , aeLanguages    :: IORef [Text]
-      , aeCache        :: IORef (Map.Map Text Dynamic)
-      , aeMsgLimit     :: IORef Int64
-      , aeFrameLimit   :: IORef Int64
+      , aeBody         :: !(IORef RequestBody)
+      , aeRespStatus   :: !(IORef Status)
+      , aeRespHeaders  :: !(IORef ResponseHeaders)
+      , aeRespMaker    :: !(IORef ResponseMaker)
+      , aeFinalize     :: !(IORef (IO ()))
+      , aeBodyLimit    :: !(IORef Int64)
+      , aeBodyCounter  :: !(IORef Int64)
+      , aeLanguages    :: !(IORef [Text])
+      , aeCache        :: !(IORef (Map.Map Text Dynamic))
+      , aeMsgLimit     :: !(IORef Int64)
+      , aeFrameLimit   :: !(IORef Int64)
       }
 
 
