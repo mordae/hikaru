@@ -18,16 +18,24 @@ where
   import Praha
   import Praha.Config.Environment
 
-  import Crypto.Hash
-  import Crypto.MAC.HMAC
-  import Crypto.Random.Entropy
+  import System.IO.Unsafe
+
+  import OpenSSL
+  import OpenSSL.Random
+  import OpenSSL.EVP.Base64
+  import OpenSSL.EVP.Digest
 
   import Data.Text (splitOn)
   import Data.Time.Clock.POSIX (getPOSIXTime)
 
-  import Data.ByteArray.Encoding
-
   import Hikaru.Action
+
+
+  sha256 :: Digest
+  sha256 = case unsafePerformIO (withOpenSSL (getDigestByName "sha256")) of
+             Nothing -> error "OpenSSL does not provide sha256"
+             Just dg -> dg
+  {-# NOINLINE sha256 #-}
 
 
   -- |
@@ -40,7 +48,7 @@ where
     now    <- getTimestamp
     secret <- getSecret
 
-    let signature = sign now secret
+    let signature = sign secret now
      in return $ mconcat [ tshow now, ":", signature ]
 
 
@@ -61,7 +69,7 @@ where
             secret <- getConfigDefault "CSRF_SECRET" ""
 
             if timestamp + valid >= now
-               then return (sign timestamp secret == signature)
+               then return (sign secret timestamp == signature)
                else return False
 
           Nothing -> return False
@@ -91,12 +99,12 @@ where
         return secret
 
 
-  sign :: Int64 -> Text -> Text
-  sign timestamp secret = tshow $ hmacGetDigest digest
+  sign :: Text -> Int64 -> Text
+  sign secret timestamp = cs signature
     where
-      digest      = hmac timeBytes secretBytes :: HMAC SHA256
-      secretBytes = cs secret :: ByteString
-      timeBytes   = cs (show timestamp) :: ByteString
+      signature   = hmacBS sha256 secretBytes timeBytes
+      secretBytes = cs secret
+      timeBytes   = cs (show timestamp)
 
 
   -- |
@@ -105,9 +113,9 @@ where
   --
   generateSecret :: (MonadIO m) => Int -> m Text
   generateSecret n = do
-    (bstr :: ByteString) <- liftIO $ getEntropy n
+    (bstr :: ByteString) <- liftIO $ prandBytes n
 
-    let (bstr64 :: ByteString) = convertToBase Base64 bstr
+    let bstr64 = encodeBase64BS bstr
      in return (cs bstr64)
 
 

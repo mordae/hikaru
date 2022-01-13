@@ -122,7 +122,6 @@ where
   import Control.Monad.Trans.Resource
   import Data.Aeson
   import Data.Binary.Builder
-  import Data.ByteArray.Encoding
   import Data.ByteString.Char8 (words, span, drop)
   import Data.CaseInsensitive (mk)
   import Data.Dynamic
@@ -135,6 +134,7 @@ where
   import Network.HTTP.Types.Status
   import Network.Wai
   import Network.Wai.Handler.WebSockets
+  import OpenSSL.EVP.Base64
   import System.IO.Unsafe
   import UnliftIO
   import Web.Cookie
@@ -250,15 +250,15 @@ where
     bracket_ (return ()) (finalize env) do
       _   <- run env
 
-      status  <- readIORef $ aeRespStatus  $ env
-      headers <- readIORef $ aeRespHeaders $ env
-      make    <- readIORef $ aeRespMaker   $ env
+      status  <- readIORef $ env.aeRespStatus
+      headers <- readIORef $ env.aeRespHeaders
+      make    <- readIORef $ env.aeRespMaker
 
       resp (make status headers)
 
     where
       finalize :: ActionEnv -> IO ()
-      finalize = join . readIORef . aeFinalize
+      finalize = join . readIORef . (.aeFinalize)
 
 
   -- |
@@ -320,7 +320,7 @@ where
   -- Obtain the original 'Request'.
   --
   getRequest :: (MonadAction m) => m Request
-  getRequest = aeRequest <$> getActionEnv
+  getRequest = (.aeRequest) <$> getActionEnv
 
 
   -- |
@@ -553,14 +553,14 @@ where
   -- length is not known beforehand.
   --
   setBodyLimit :: (MonadAction m) => Int64 -> m ()
-  setBodyLimit = setActionField aeBodyLimit
+  setBodyLimit = setActionField (.aeBodyLimit)
 
 
   -- |
   -- Return the payload size limit set by 'setBodyLimit'.
   --
   getBodyLimit :: (MonadAction m) => m Int64
-  getBodyLimit = getActionField aeBodyLimit
+  getBodyLimit = getActionField (.aeBodyLimit)
 
 
   -- |
@@ -587,8 +587,8 @@ where
   --
   getBodyChunkIO :: (MonadAction m) => m (IO ByteString)
   getBodyChunkIO = do
-    limit    <- getActionField aeBodyLimit
-    counter  <- aeBodyCounter <$> getActionEnv
+    limit    <- getActionField (.aeBodyLimit)
+    counter  <- (.aeBodyCounter) <$> getActionEnv
     getChunk <- getRequestBodyChunk <$> getRequest
 
     return do
@@ -652,7 +652,7 @@ where
   getJSON :: (MonadAction m, FromJSON a) => m a
   getJSON = do
     -- First check out our stash.
-    cache <- getActionField aeBody
+    cache <- getActionField (.aeBody)
 
     case cache of
       -- This is ideal, we already have what we need.
@@ -670,7 +670,7 @@ where
            else abort unsupportedMediaType415 [] "Send some JSON!"
 
         -- Taint and read.
-        setActionField aeBody BodyTainted
+        setActionField (.aeBody) BodyTainted
         body <- getBodyRaw
 
         -- Try to parse.
@@ -679,7 +679,7 @@ where
                    Right value -> return value
 
         -- Cache and return.
-        setActionField aeBody (BodyJSON value)
+        setActionField (.aeBody) (BodyJSON value)
 
         -- Parse to the output type.
         case fromJSON value of
@@ -781,7 +781,7 @@ where
   --
   getFormData :: (MonadAction m) => m FormData
   getFormData = do
-    cache <- getActionField aeBody
+    cache <- getActionField (.aeBody)
 
     case cache of
       -- This is ideal, we already have what we need.
@@ -807,7 +807,7 @@ where
             let form = adaptForm form'
 
             -- Cache and return.
-            setActionField aeBody (BodyForm form)
+            setActionField (.aeBody) (BodyForm form)
             return form
 
       -- Now this is bad. We have already read the body,
@@ -837,7 +837,7 @@ where
   --
   getBody :: (MonadAction m) => m LBS.ByteString
   getBody = do
-    cache <- getActionField aeBody
+    cache <- getActionField (.aeBody)
 
     case cache of
       -- This is ideal, we already have what we need.
@@ -846,14 +846,14 @@ where
       -- Body has not been parsed yet. This is very good.
       BodyUnparsed -> do
         -- Taint and read.
-        setActionField aeBody BodyTainted
+        setActionField (.aeBody) BodyTainted
         body <- getBodyRaw
 
         -- Force it whole.
         _len  <- LBS.length <$> pure body
 
         -- Cache and return.
-        setActionField aeBody (BodyBytes body)
+        setActionField (.aeBody) (BodyBytes body)
         return body
 
       -- Now this is bad. We have already read the body,
@@ -869,21 +869,21 @@ where
   -- Set the status to use when building our 'Response'.
   --
   setStatus :: (MonadAction m) => Status -> m ()
-  setStatus = setActionField aeRespStatus
+  setStatus = setActionField (.aeRespStatus)
 
 
   -- |
   -- Set headers to use when building our 'Response'.
   --
   setHeaders :: (MonadAction m) => ResponseHeaders -> m ()
-  setHeaders = setActionField aeRespHeaders
+  setHeaders = setActionField (.aeRespHeaders)
 
 
   -- |
   -- Append a single 'Response' header without checking.
   --
   addHeader :: (MonadAction m) => HeaderName -> ByteString -> m ()
-  addHeader n v = modifyActionField aeRespHeaders ((n, v) :)
+  addHeader n v = modifyActionField (.aeRespHeaders) ((n, v) :)
 
 
   -- |
@@ -891,7 +891,7 @@ where
   -- If the header has been given multiple times, leave only one.
   --
   setHeader :: (MonadAction m) => HeaderName -> ByteString -> m ()
-  setHeader n v = modifyActionField aeRespHeaders update
+  setHeader n v = modifyActionField (.aeRespHeaders) update
     where
       update hs = (n, v) : deleteBy headerEq (n, v) hs
 
@@ -919,7 +919,7 @@ where
   --
   modifyHeader :: (MonadAction m)
                => HeaderName -> (Maybe ByteString -> ByteString) -> m ()
-  modifyHeader n fn = modifyActionField aeRespHeaders update
+  modifyHeader n fn = modifyActionField (.aeRespHeaders) update
     where
       update hs = (n, v') : deleteBy headerEq (n, v') hs
         where v' = fn (lookup n hs)
@@ -1017,7 +1017,7 @@ where
   --
   setResponseFile :: (MonadAction m) => FilePath -> Maybe FilePart -> m ()
   setResponseFile fp mfp = do
-    setActionField aeRespMaker \st hs -> responseFile st hs fp mfp
+    setActionField (.aeRespMaker) \st hs -> responseFile st hs fp mfp
 
 
   -- |
@@ -1025,7 +1025,7 @@ where
   --
   setResponseBuilder :: (MonadAction m) => Builder -> m ()
   setResponseBuilder bld = do
-    setActionField aeRespMaker \st hs -> responseBuilder st hs bld
+    setActionField (.aeRespMaker) \st hs -> responseBuilder st hs bld
 
 
   -- |
@@ -1033,7 +1033,7 @@ where
   --
   setResponseBS :: (MonadAction m) => LBS.ByteString -> m ()
   setResponseBS bs = do
-    setActionField aeRespMaker \st hs -> responseLBS st hs bs
+    setActionField (.aeRespMaker) \st hs -> responseLBS st hs bs
 
 
   -- |
@@ -1069,7 +1069,7 @@ where
   --
   setResponseStream :: (MonadAction m) => StreamingBody -> m ()
   setResponseStream strm = do
-    setActionField aeRespMaker \st hs -> responseStream st hs strm
+    setActionField (.aeRespMaker) \st hs -> responseStream st hs strm
 
 
   -- |
@@ -1091,7 +1091,7 @@ where
                  -> Response
                  -> m ()
   setResponseRaw comm resp = do
-    setActionField aeRespMaker \_st _hs -> responseRaw comm resp
+    setActionField (.aeRespMaker) \_st _hs -> responseRaw comm resp
 
 
   -- WebSockets --------------------------------------------------------------
@@ -1107,7 +1107,7 @@ where
   -- to communicate in one way only.
   --
   setFrameLimit :: (MonadAction m) => Int64 -> m ()
-  setFrameLimit = setActionField aeFrameLimit
+  setFrameLimit = setActionField (.aeFrameLimit)
 
 
   -- |
@@ -1122,7 +1122,7 @@ where
   -- Single message may or may not consist of multiple frames.
   --
   setMessageLimit :: (MonadAction m) => Int64 -> m ()
-  setMessageLimit = setActionField aeMsgLimit
+  setMessageLimit = setActionField (.aeMsgLimit)
 
 
   -- |
@@ -1133,14 +1133,14 @@ where
   -- Sets up an automatic keep-alive with a 30s ping interval.
   --
   setResponseWS :: (MonadAction m) => WebSocket () -> m ()
-  setResponseWS ws = do
+  setResponseWS WebSocket{runWebSocket} = do
     -- First check the body situation.
-    body <- getActionField aeBody
+    body <- getActionField (.aeBody)
 
     case body of
       BodyUnparsed -> do
-        frameLimit   <- WS.SizeLimit <$> getActionField aeFrameLimit
-        messageLimit <- WS.SizeLimit <$> getActionField aeMsgLimit
+        frameLimit   <- WS.SizeLimit <$> getActionField (.aeFrameLimit)
+        messageLimit <- WS.SizeLimit <$> getActionField (.aeMsgLimit)
 
         let opts = WS.defaultConnectionOptions
                      { WS.connectionFramePayloadSizeLimit = frameLimit
@@ -1149,8 +1149,8 @@ where
 
         req <- getRequest
 
-        setActionField aeBody BodyWebSocket
-        setActionField aeRespMaker \_st _hs ->
+        setActionField (.aeBody) BodyWebSocket
+        setActionField (.aeRespMaker) \_st _hs ->
           case websocketsApp opts app req of
             Nothing   -> responseLBS status400 [] "WebSocket Expected"
             Just resp -> resp
@@ -1164,7 +1164,7 @@ where
         void do
           conn <- WS.acceptRequest pc
           WS.withPingThread conn 30 (return ()) do
-            runReaderT (unWebSocket ws) conn
+            runReaderT runWebSocket conn
 
 
   -- |
@@ -1172,7 +1172,7 @@ where
   --
   newtype WebSocket a
     = WebSocket
-      { unWebSocket    :: ReaderT WS.Connection IO a
+      { runWebSocket   :: ReaderT WS.Connection IO a
       }
     deriving (MonadUnliftIO, MonadIO, Monad, Applicative, Functor)
 
@@ -1247,7 +1247,7 @@ where
   -- the localization tools found in the "Hikaru.Localize" module.
   --
   getLanguages :: (MonadAction m) => m [Text]
-  getLanguages = getActionField aeLanguages
+  getLanguages = getActionField (.aeLanguages)
 
 
   -- |
@@ -1256,7 +1256,7 @@ where
   -- See 'getLanguages' above for more information.
   --
   setLanguages :: (MonadAction m) => [Text] -> m ()
-  setLanguages = setActionField aeLanguages
+  setLanguages = setActionField (.aeLanguages)
 
 
   -- Cacheing ----------------------------------------------------------------
@@ -1279,12 +1279,12 @@ where
   --
   withCache :: (MonadAction m, Typeable a) => Text -> m a -> m a
   withCache key makeValue = do
-    cache <- getActionField aeCache
+    cache <- getActionField (.aeCache)
 
     case fromDynamic =<< Map.lookup key cache of
       Nothing -> do
         value <- makeValue
-        modifyActionField aeCache (Map.insert key (toDyn value))
+        modifyActionField (.aeCache) (Map.insert key (toDyn value))
         return value
 
       Just value -> do
@@ -1296,7 +1296,7 @@ where
   --
   dropCache :: (MonadAction m) => Text -> m ()
   dropCache key = do
-    modifyActionField aeCache (Map.delete key)
+    modifyActionField (.aeCache) (Map.delete key)
 
 
   -- |
@@ -1304,7 +1304,7 @@ where
   --
   dropCaches :: (MonadAction m) => m ()
   dropCaches = do
-    modifyActionField aeCache (const Map.empty)
+    modifyActionField (.aeCache) (const Map.empty)
 
 
   -- Finalizing --------------------------------------------------------------
@@ -1316,7 +1316,7 @@ where
   --
   registerFinalizer :: (MonadAction m) => IO a -> m ()
   registerFinalizer fin = do
-    modifyActionField aeFinalize (fin >>)
+    modifyActionField (.aeFinalize) (fin >>)
 
 
   -- Misc Utilities ----------------------------------------------------------
@@ -1337,18 +1337,13 @@ where
   cs2 (x, y) = (cs x, cs y)
 
 
-  decodeBase64 :: ByteString -> Either String ByteString
-  decodeBase64 bstr = convertFromBase Base64 bstr
-
-
   parseBasicAuth :: ByteString -> Maybe (Text, Text)
   parseBasicAuth value =
     case words value of
       [method, auth] | mk method == "Basic" -> do
-        case decodeBase64 auth of
-          Left _   -> Nothing
-          Right lp -> let (l, p) = span (/= ':') lp
-                       in Just (cs l, cs (drop 1 p))
+        let lp = decodeBase64BS (cs auth)
+            (l, p) = span (/= ':') lp
+         in Just (cs l, cs (drop 1 p))
 
       _otherwise -> Nothing
 

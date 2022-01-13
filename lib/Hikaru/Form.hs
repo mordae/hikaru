@@ -177,8 +177,8 @@ where
     {-# INLINE pure #-}
 
     l <*> r = FormT do
-      l' <- runFormT l
-      r' <- runFormT r
+      l' <- l.runFormT
+      r' <- r.runFormT
       return $ l' <*> r'
     {-# INLINE (<*>) #-}
 
@@ -217,8 +217,8 @@ where
     {-# INLINE pure #-}
 
     l <*> r = ElementT do
-      l' <- runElementT l
-      r' <- runElementT r
+      l' <- l.runElementT
+      r' <- r.runElementT
       return $ l' <*> r'
     {-# INLINE (<*>) #-}
 
@@ -455,7 +455,7 @@ where
   -- @
   --
   newForm :: (Monad m) => Text -> Maybe o -> Form l m o -> m (View l)
-  newForm name orig = flip execStateT view . flip runReaderT env . runFormT
+  newForm name orig = flip execStateT view . flip runReaderT env . (.runFormT)
     where
       view = View [] []
       env  = Env { envPrefix   = name
@@ -583,7 +583,7 @@ where
 
     (res, new) <- lift $ lift do
       let base = Element label []
-       in flip runStateT base $ flip runReaderT env $ runElementT body
+       in flip runStateT base $ flip runReaderT env $ body.runElementT
 
     modify \view@View{..} ->
       view { viewElements = viewElements <> [new] }
@@ -608,14 +608,14 @@ where
     new <- lift $ lift do
       let field = InputField "hidden" Nothing text
           ctrst = ControlState name field [] [] val
-       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
+       in flip execStateT ctrst $ flip runReaderT env $ body.runControlT
 
     ctrl <- lift $ lift $ buildControl env new
 
     modify \view@View{..} ->
       view { viewControls = viewControls <> [ctrl] }
 
-    return $ csValue new
+    return $ new.csValue
 
 
   -- |
@@ -636,14 +636,14 @@ where
     new <- lift $ lift do
       let field = InputField "hidden" Nothing text
           ctrst = ControlState name field [] [] val
-       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
+       in flip execStateT ctrst $ flip runReaderT env $ body.runControlT
 
     ctrl <- lift $ lift $ buildControl env new
 
     modify \view@View{..} ->
       view { viewControls = viewControls <> [ctrl] }
 
-    return $ csValue new
+    return $ new.csValue
 
 
   -- |
@@ -681,14 +681,14 @@ where
     new <- lift $ lift do
       let field = InputField "text" Nothing text
           ctrst = ControlState name field [] [] val
-       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
+       in flip execStateT ctrst $ flip runReaderT env $ body.runControlT
 
     ctrl <- lift $ lift $ buildControl env new
 
     modify \elt@Element{..} ->
       elt { elemControls = elemControls <> [ctrl] }
 
-    return $ csValue new
+    return $ new.csValue
 
 
   -- |
@@ -727,14 +727,14 @@ where
       let val'  = val <|> (getter <$> envValue)
           field = SelectField []
           ctrst = ControlState name field [] [] val'
-       in flip execStateT ctrst $ flip runReaderT env $ runControlT body
+       in flip execStateT ctrst $ flip runReaderT env $ body.runControlT
 
     ctrl <- lift $ lift $ buildControl env new
 
     modify \elt@Element{..} ->
       elt { elemControls = elemControls <> [ctrl] }
 
-    return $ csValue new
+    return $ new.csValue
 
 
   -- |

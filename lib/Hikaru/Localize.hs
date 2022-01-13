@@ -157,8 +157,8 @@ where
     preferred <- getParamMaybe paramName
     previous  <- getCookieMaybe cookieName
     acceptable <- getAcceptLanguage
-                  <&> filter ((> 0) . quality)
-                  <&> map mainType
+                  <&> filter ((> 0) . (.quality))
+                  <&> map (.mainType)
 
     case preferred of
       Nothing   -> return ()

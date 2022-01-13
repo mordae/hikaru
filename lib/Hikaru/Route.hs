@@ -221,9 +221,10 @@ where
   -- dispatching or with 'routeScore'.
   --
   (/?) :: Route ts a -> Appraisal -> Route ts a
-  (/?) r@Route{..} Appraisal{score = score', vary = vary'} =
-    r { vary  = nub (vary' <> vary)
-      , score = score' : score
+  (/?) r a =
+    r { vary  = nub (a.vary <> r.vary)
+      , score = a.score : r.score
+      , path  = r.path
       }
 
 

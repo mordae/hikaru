@@ -147,10 +147,10 @@ where
   -- False
   --
   matchMedia :: Media -> Media -> Bool
-  matchMedia l r = mainMatches && subMatches && quality r > 0.0
+  matchMedia l r = mainMatches && subMatches && r.quality > 0.0
     where
-      mainMatches = mainType l == mainType r || mainType r == "*"
-      subMatches  =  subType l == subType r  ||  subType r == "*"
+      mainMatches = l.mainType == r.mainType || r.mainType == "*"
+      subMatches  = l.subType  == r.subType  || r.subType  == "*"
 
 
   -- |
@@ -176,9 +176,9 @@ where
   selectMedia :: [Media] -> [Media] -> Maybe Media
   selectMedia ls rs = case best of
                         [ ]      -> Nothing
-                        (l, r):_ -> Just $ l { quality = quality r }
+                        (l, r):_ -> Just $ l { quality = r.quality }
     where
-      best = sortOn (negate . quality . snd) good
+      best = sortOn (negate . (.quality) . snd) good
       good = filter (uncurry matchMedia) prod
       prod = [(l, r) | l <- ls, r <- rs]
 
