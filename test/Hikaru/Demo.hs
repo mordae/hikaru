@@ -16,13 +16,12 @@ where
 
   import Hikaru
 
-  import UnliftIO.MVar
   import Data.Aeson (Value)
+  import Data.Text (unlines)
   import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
-  import Network.Wai
-  import Data.Text (unlines)
+  import UnliftIO.MVar
 
 
   -- Action ------------------------------------------------------------------
@@ -39,10 +38,10 @@ where
     deriving (Functor, Applicative, Monad, MonadIO)
 
   instance MonadAction Action where
-    getActionEnv = Action (demoActionEnv <$> ask)
+    getActionEnv = Action ((.demoActionEnv) <$> ask)
 
   instance MonadModel Action where
-    getModelEnv = Action (demoModelEnv <$> ask)
+    getModelEnv = Action ((.demoModelEnv) <$> ask)
 
 
   data DemoEnv
@@ -74,7 +73,7 @@ where
 
   countVisitor :: (MonadModel m) => m Word
   countVisitor = do
-    counter <- modelCounter <$> getModelEnv
+    counter <- (.modelCounter) <$> getModelEnv
     liftIO do
       modifyMVar_ counter (return . (+ 1))
       readMVar counter
@@ -82,7 +81,7 @@ where
 
   addCase :: (MonadModel m) => AddCase -> m Case
   addCase AddCase{..} = do
-    nextId  <- liftIO . readMVar . modelCounter =<< getModelEnv
+    nextId  <- liftIO . readMVar . (.modelCounter) =<< getModelEnv
 
     let case' = Case { caseId     = nextId
                      , caseName   = acName
@@ -91,7 +90,7 @@ where
                      , caseActive = acActive
                      }
 
-    cases <- modelCases <$> getModelEnv
+    cases <- (.modelCases) <$> getModelEnv
 
     liftIO do
       modifyMVar_ cases (return . (<> [case']))
@@ -110,7 +109,7 @@ where
   runAction :: ModelEnv -> Action () -> Application
   runAction me act = do
     respond \ae -> do
-      runReaderT (unAction act) (DemoEnv ae me)
+      runReaderT ((.unAction) act) (DemoEnv ae me)
 
 
   makeApplication :: ModelEnv -> Application
@@ -215,7 +214,7 @@ where
       handle = do
         setHeader hCacheControl "no-store"
 
-        cases <- liftIO . readMVar . modelCases =<< getModelEnv
+        cases <- liftIO . readMVar . (.modelCases) =<< getModelEnv
 
         sendHTML do
           h1_ "Cases"
@@ -361,18 +360,18 @@ where
     (\(x1, x2) x3 x4 -> AddCase x1 x2 x3 x4)
       <$> element MsgCaseName do
             (,)
-              <$> input "name" acName do
+              <$> input "name" (.acName) do
                     return ()
 
-              <*> input "recno" acRecNo do
+              <*> input "recno" (.acRecNo) do
                     return ()
 
       <*> element MsgCaseMode do
-            select "mode" acMode do
+            select "mode" (.acMode) do
               return ()
 
       <*> element MsgCaseEnabled do
-            select "active" acActive do
+            select "active" (.acActive) do
               hint RenderExpanded
 
 

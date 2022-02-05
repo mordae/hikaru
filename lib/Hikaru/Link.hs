@@ -24,15 +24,12 @@ where
   import Hikaru.Route
   import Hikaru.Types
 
-  import Network.HTTP.Types.URI
-
   import Data.Binary.Builder
+  import Data.HVect
   import Data.List (map, filter)
   import Data.Maybe (isJust)
-
-  import Data.HVect
-
   import Lucid
+  import Network.HTTP.Types.URI
 
 
   -- |

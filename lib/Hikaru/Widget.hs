@@ -54,6 +54,7 @@ module Hikaru.Widget
 
   -- * Building Widgets
   , WidgetT
+  , getPrefix
   , getArguments
   , getArgumentMaybe
   , getArgumentDefault
@@ -64,11 +65,12 @@ module Hikaru.Widget
   )
 where
   import Praha
-  import Data.Text (stripPrefix)
+
   import Data.List (lookup, filter)
-  import Lucid
-  import Hikaru.Types
+  import Data.Text (stripPrefix)
   import Hikaru.Action
+  import Hikaru.Types
+  import Lucid
 
 
   -- |
@@ -159,6 +161,15 @@ where
       { args           :: [(Text, Text)]
       , prefix         :: Text
       }
+
+
+  -- |
+  -- Obtain widget prefix as text.
+  --
+  getPrefix :: (Monad m) => WidgetT m Text
+  getPrefix = WidgetT do
+    Env{prefix} <- ask
+    return prefix
 
 
   -- |

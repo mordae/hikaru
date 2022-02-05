@@ -34,11 +34,10 @@ where
   import Hikaru.Action (abortMiddleware)
   import Hikaru.Route
 
-  import Network.HTTP.Types.Status
+  import Data.List (sortOn, reverse, lookup)
   import Network.HTTP.Types.Header
+  import Network.HTTP.Types.Status
   import Network.Wai
-
-  import Data.List (reverse, lookup, sortOn)
 
 
   -- |

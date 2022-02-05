@@ -18,17 +18,15 @@ where
   import Praha
   import Praha.Config.Environment
 
-  import System.IO.Unsafe
-
-  import OpenSSL
-  import OpenSSL.Random
-  import OpenSSL.EVP.Base64
-  import OpenSSL.EVP.Digest
+  import Hikaru.Action
 
   import Data.Text (splitOn)
   import Data.Time.Clock.POSIX (getPOSIXTime)
-
-  import Hikaru.Action
+  import OpenSSL
+  import OpenSSL.EVP.Base64
+  import OpenSSL.EVP.Digest
+  import OpenSSL.Random
+  import System.IO.Unsafe
 
 
   sha256 :: Digest

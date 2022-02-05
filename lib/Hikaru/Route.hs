@@ -55,17 +55,16 @@ module Hikaru.Route
   )
 where
   import Praha hiding (curry)
+
   import Hikaru.Media
   import Hikaru.Types
 
+  import Data.HVect hiding (reverse)
+  import Data.List (nub, reverse, lookup)
+  import Data.Typeable (TypeRep, typeRep)
   import Network.HTTP.Types.Header
   import Network.Wai
   import Network.Wai.Handler.WebSockets
-
-  import Data.List (reverse, nub, lookup)
-  import Data.Typeable (TypeRep, typeRep)
-
-  import Data.HVect hiding (reverse)
 
 
   -- |

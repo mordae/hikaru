@@ -27,10 +27,9 @@ module Hikaru.Media
 where
   import Praha
 
-  import Data.List (filter, lookup, sortOn)
-
-  import Data.Char
   import Data.Attoparsec.Text
+  import Data.Char
+  import Data.List (filter, lookup, sortOn)
 
 
   -- |
