@@ -185,7 +185,7 @@ where
   -- other purpose.
   --
   (/:) :: forall ts a b. (Param a, Typeable a)
-       => Route ts (a -> b) -> Text -> Route (Reverse (a ': Reverse ts)) b
+       => Route ts (a -> b) -> Text -> Route (Append ts '[a]) b
   (/:) r@Route{..} name = r { path = capture : path
                             , func = apply
                             }
