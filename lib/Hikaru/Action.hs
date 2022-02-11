@@ -926,20 +926,18 @@ where
 
 
   -- |
-  -- Set a cookie with just a name and a value.
+  -- Set a cookie with name, value and @SameSite=Lax@.
   --
   -- Such cookies are valid for the whole domain, expire when the browser
-  -- is closed, can be accessed from JavaScript and may be sent with
+  -- is closed, can be accessed from JavaScript and can not be sent with
   -- cross-site requests.
-  --
-  -- Do not use cookies set in this way for anything else than storing
-  -- simple user preferences.
   --
   setCookie :: (MonadAction m) => Text -> Text -> m ()
   setCookie name value = do
-    setCookieEx $ defaultSetCookie { setCookieName  = cs name
-                                   , setCookieValue = cs value
-                                   , setCookiePath  = Just "/"
+    setCookieEx $ defaultSetCookie { setCookieName     = cs name
+                                   , setCookieValue    = cs value
+                                   , setCookiePath     = Just "/"
+                                   , setCookieSameSite = Just sameSiteLax
                                    }
 
 
