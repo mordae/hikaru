@@ -195,13 +195,15 @@ where
   postCaseR = post handle // "case" // "" /? acceptForm
     where
       handle = do
-        (res, view) <- postForm "addCase" addCaseForm
+        setLanguages ["en", "cs"]
+
+        (res, form) <- postForm addCaseForm
 
         case res of
           Nothing -> do
             setStatus status400
             sendHTML do
-              simpleForm_ view
+              simpleForm_ form
 
           Just ac -> do
             _case <- addCase ac
@@ -213,6 +215,7 @@ where
     where
       handle = do
         setHeader hCacheControl "no-store"
+        setLanguages ["en", "cs"]
 
         cases <- liftIO . readMVar . (.modelCases) =<< getModelEnv
 
@@ -220,8 +223,8 @@ where
           h1_ "Cases"
 
           form_ [method_ "POST"] do
-            view <- newForm "addCase" Nothing addCaseForm
-            simpleForm_ view
+            form <- newForm addCaseForm
+            simpleForm_ form
             button_ [type_ "submit"] "Submit"
 
           table_ do
@@ -244,57 +247,56 @@ where
   -- Forms -------------------------------------------------------------------
 
 
-  simpleForm_ :: (MonadAction m, Localizable l) => View l -> HtmlT m ()
-  simpleForm_ View{..} = do
-    forM_ viewControls \ctrl@Control{..} -> do
-      viewControl_ ctrl
-      forM_ ctrlNotes \Note{..} -> do
-        p_ do
-          lc_ noteMessage
-
-    forM_ viewElements \Element{..} -> do
+  simpleForm_ :: (MonadAction m, Localizable l) => Form l -> HtmlT m ()
+  simpleForm_ Form{..} = do
+    forM_ formControls \ctrl@Control{..} -> do
       div_ do
         div_ do
-          case elemControls of
-            Control{..}:_ -> label_ [for_ ctrlName] $ lc_ elemLabel
-            _otherwise    -> label_ $ lc_ elemLabel
+          case ctrlLabel of
+            Nothing -> return ()
+            Just lb -> label_ [for_ ctrlName] $ lc_ lb
 
-        div_ do
-          forM_ elemControls \ctrl@Control{} -> do
-            viewControl_ ctrl
+        formControl_ ctrl
 
-          forM_ elemControls \Control{..} -> do
-            forM_ ctrlNotes \Note{..} -> do
-              p_ do
-                lc_ noteMessage
+        forM_ ctrlNotes \Note{..} -> do
+          p_ do
+            lc_ noteMessage
 
 
-  viewControl_ :: (Localizable l, MonadAction m) => Control l -> HtmlT m ()
-  viewControl_ Control{..} = do
-    case ctrlField of
-      InputField{..} -> do
-        ph <- lc fieldPlacehold
-        input_ [ type_ fieldType
+  formControl_ :: (Localizable l, MonadAction m) => Control l -> HtmlT m ()
+  formControl_ Control{..} = do
+    case ctrlType of
+      "select" -> do
+        select_ [name_ ctrlName, id_ ctrlName] do
+          mapM_ (choice_ ctrlValues) ctrlChoices
+
+      "multiselect" -> do
+        select_ [name_ ctrlName, id_ ctrlName, multiple_ "multiple"] do
+          mapM_ (choice_ ctrlValues) ctrlChoices
+
+      "textarea" -> do
+        textarea_ [name_ ctrlName, id_ ctrlName] do
+          case ctrlValues of
+            text:_ -> toHtml text
+            _else  -> ""
+
+      _other -> do
+        ph <- lc ctrlPlaceholder
+
+        input_ [ type_ ctrlType
                , name_ ctrlName
                , placeholder_ ph
-               , value_ fieldValue
+               , value_ case ctrlValues of
+                          text:_ -> text
+                          _else  -> ""
                ]
 
-      SelectField{..} -> do
-        select_ [name_ ctrlName] do
-          mapM_ viewOption_ fieldOptions
 
-
-  viewOption_ :: (MonadAction m, Localizable l) => Option l -> HtmlT m ()
-  viewOption_ Option{..} = do
-    case optionSelected of
-      True -> do
-        option_ [selected_ "selected", value_ optionValue] do
-          lc_ optionLabel
-
-      False -> do
-        option_ [value_ optionValue] do
-          lc_ optionLabel
+  choice_ :: (MonadAction m, Localizable l) => [Text] -> (l, Text) -> HtmlT m ()
+  choice_ selected (l, v) = do
+    if v `elem` selected
+       then option_ [selected_ "selected", value_ v] $ lc_ l
+       else option_ [value_ v] $ lc_ l
 
 
   data Case
@@ -319,7 +321,7 @@ where
   data AccessMode
     = ModePublic
     | ModePrivate
-    deriving (Show, Eq)
+    deriving (Show, Enum, Bounded, Eq)
 
   instance Param AccessMode where
     toParam ModePublic  = "public"
@@ -338,41 +340,57 @@ where
 
   data Messages
     = MsgCaseName
+    | MsgCaseRecNo
     | MsgCaseMode
     | MsgCaseEnabled
-    | MsgForm FormMessage
+    | MsgRequired
+    | MsgSubmit
+    | MsgAccessMode AccessMode
+    | MsgBool Bool
     deriving (Show)
 
   instance Localizable Messages where
     localize "en" MsgCaseName    = Just "Name"
     localize "en" MsgCaseMode    = Just "Mode"
     localize "en" MsgCaseEnabled = Just "Enabled"
+    localize "en" MsgCaseRecNo   = Just "Record #"
+    localize "en" MsgSubmit      = Just "Submit"
 
-    localize lang (MsgForm msg)  = localize lang msg
+    localize "en" MsgRequired    = Just "This field is required."
+
+    localize "en" (MsgAccessMode ModePublic)  = Just "Public"
+    localize "en" (MsgAccessMode ModePrivate) = Just "Private"
+
+    localize "en" (MsgBool True)  = Just "True"
+    localize "en" (MsgBool False) = Just "False"
+
     localize _lang _msg          = Nothing
 
-  instance FromFormMessage Messages where
-    fromFormMessage = MsgForm
 
-
-  addCaseForm :: (MonadAction m) => Form Messages m AddCase
+  addCaseForm :: (MonadAction m) => FormT Messages m (Maybe AddCase)
   addCaseForm = do
-    (\(x1, x2) x3 x4 -> AddCase x1 x2 x3 x4)
-      <$> element MsgCaseName do
-            (,)
-              <$> input "name" (.acName) do
-                    return ()
+    acName <- input "name" MsgCaseName Nothing
+                [ required MsgRequired
+                ]
 
-              <*> input "recno" (.acRecNo) do
-                    return ()
+    acRecNo <- input "recno" MsgCaseRecNo Nothing
+                [ required MsgRequired
+                , format "number"
+                ]
 
-      <*> element MsgCaseMode do
-            select "mode" (.acMode) do
-              return ()
+    acMode <- select "mode" MsgCaseMode Nothing
+                [ choicesEnum MsgAccessMode
+                , required MsgRequired
+                ]
 
-      <*> element MsgCaseEnabled do
-            select "active" (.acActive) do
-              hint RenderExpanded
+    acActive <- select "active" MsgCaseEnabled Nothing
+                  [ choicesEnum MsgBool
+                  , required MsgRequired
+                  ]
+
+    _submit <- button "submit" MsgSubmit []
+
+    return $ AddCase <$> acName <*> acRecNo <*> acMode <*> acActive
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

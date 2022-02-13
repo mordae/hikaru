@@ -27,7 +27,6 @@ where
   import Data.Binary.Builder
   import Data.HVect
   import Data.List (map, filter)
-  import Data.Maybe (isJust)
   import Lucid
   import Network.HTTP.Types.URI
 

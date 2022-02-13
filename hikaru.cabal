@@ -42,17 +42,13 @@ library
 
     hs-source-dirs:     lib
     other-modules:      Paths_hikaru
-    default-language:   Haskell2010
+    default-language:   GHC2021
     default-extensions:
-        AllowAmbiguousTypes BangPatterns BlockArguments ConstraintKinds
-        DataKinds DefaultSignatures DeriveGeneric DuplicateRecordFields
-        EmptyDataDecls FlexibleContexts FlexibleInstances
-        GeneralizedNewtypeDeriving ImportQualifiedPost KindSignatures
-        LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude
-        OverloadedStrings PolyKinds RankNTypes RecordWildCards
-        ScopedTypeVariables StandaloneDeriving TupleSections
-        TypeApplications TypeFamilies TypeOperators UndecidableInstances
-        DisambiguateRecordFields NoFieldSelectors OverloadedRecordDot
+        AllowAmbiguousTypes BlockArguments DataKinds DefaultSignatures
+        DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase
+        NoImplicitPrelude OverloadedStrings RecordWildCards TypeFamilies
+        UndecidableInstances DisambiguateRecordFields NoFieldSelectors
+        OverloadedRecordDot DerivingVia
 
     ghc-options:
         -Wall -Wcompat -Wincomplete-uni-patterns -Wpartial-fields
@@ -73,7 +69,6 @@ library
         http-types >=0.12,
         hvect >=0.4,
         lucid >=2.9,
-        mtl >=2.2,
         praha >=0.1,
         praha-config >=0.1,
         resourcet >=1.2,
@@ -98,17 +93,13 @@ test-suite spec
         Hikaru.Test
         Paths_hikaru
 
-    default-language:   Haskell2010
+    default-language:   GHC2021
     default-extensions:
-        AllowAmbiguousTypes BangPatterns BlockArguments ConstraintKinds
-        DataKinds DefaultSignatures DeriveGeneric DuplicateRecordFields
-        EmptyDataDecls FlexibleContexts FlexibleInstances
-        GeneralizedNewtypeDeriving ImportQualifiedPost KindSignatures
-        LambdaCase MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude
-        OverloadedStrings PolyKinds RankNTypes RecordWildCards
-        ScopedTypeVariables StandaloneDeriving TupleSections
-        TypeApplications TypeFamilies TypeOperators UndecidableInstances
-        DisambiguateRecordFields NoFieldSelectors OverloadedRecordDot
+        AllowAmbiguousTypes BlockArguments DataKinds DefaultSignatures
+        DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase
+        NoImplicitPrelude OverloadedStrings RecordWildCards TypeFamilies
+        UndecidableInstances DisambiguateRecordFields NoFieldSelectors
+        OverloadedRecordDot DerivingVia
 
     ghc-options:
         -Wall -Wcompat -Wincomplete-uni-patterns -Wpartial-fields
@@ -130,7 +121,6 @@ test-suite spec
         http-types >=0.12,
         hvect >=0.4,
         lucid >=2.9,
-        mtl >=2.2,
         praha >=0.1,
         praha-config >=0.1,
         resourcet >=1.2,

@@ -44,6 +44,8 @@ module Hikaru.Action
   , getBodyRaw
   , getJSON
   , getBody
+  , FormData
+  , getFormData
   , getFields
   , getFieldMaybe
   , getFieldDefault

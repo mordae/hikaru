@@ -80,9 +80,34 @@ where
           assertStatus 200 resp
           assertBody "[1,2]" resp
 
+    describe "POST /case/" do
+      it "accepts valid input and redirects" do
+        runDemo do
+          let payload = "name=Hooray&recno=42&mode=public&active=true"
+          let mime = "application/x-www-form-urlencoded"
+          resp <- post "/case/" [(hContentType, mime)] payload
+          assertStatus 303 resp
+          assertHeader hLocation "/case/" resp
+
+      it "fails on incomplete payload" do
+        runDemo do
+          let payload = "active=lol"
+          let mime = "application/x-www-form-urlencoded"
+          resp <- post "/case/" [(hContentType, mime)] payload
+          assertStatus 400 resp
+          assertBodyContains "This field is required." resp
+
+    describe "GET /case/" do
+      it "now contains the added case" do
+        runDemo do
+          resp <- get "/case/" []
+          assertStatus 200 resp
+          assertBodyContains "Hooray" resp
+
 
   demo :: Application
   demo = unsafePerformIO makeDemo
+  {-# NOINLINE demo #-}
 
 
   runDemo :: Session a -> IO a
