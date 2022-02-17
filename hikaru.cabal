@@ -48,7 +48,7 @@ library
         DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase
         NoImplicitPrelude OverloadedStrings RecordWildCards TypeFamilies
         UndecidableInstances DisambiguateRecordFields NoFieldSelectors
-        OverloadedRecordDot DerivingVia
+        OverloadedRecordDot
 
     ghc-options:
         -Wall -Wcompat -Wincomplete-uni-patterns -Wpartial-fields
@@ -99,7 +99,7 @@ test-suite spec
         DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase
         NoImplicitPrelude OverloadedStrings RecordWildCards TypeFamilies
         UndecidableInstances DisambiguateRecordFields NoFieldSelectors
-        OverloadedRecordDot DerivingVia
+        OverloadedRecordDot
 
     ghc-options:
         -Wall -Wcompat -Wincomplete-uni-patterns -Wpartial-fields
