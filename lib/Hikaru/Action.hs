@@ -13,6 +13,8 @@
 
 module Hikaru.Action
   ( MonadAction(..)
+  , ActionT
+  , runActionT
 
   -- ** Inspecting Request
   , getRequest
@@ -159,17 +161,49 @@ where
     -- Return the action environment, including the 'Request' object,
     -- cached content from the user and the pending 'Response'.
     --
-    getActionEnv :: m ActionEnv
+    askActionEnv :: m ActionEnv
 
-    default getActionEnv
+    default askActionEnv
       :: (MonadTrans t, MonadAction n, m ~ t n) => m ActionEnv
-    getActionEnv = lift getActionEnv
-    {-# INLINE getActionEnv #-}
+    askActionEnv = lift askActionEnv
+    {-# INLINE askActionEnv #-}
 
   -- |
   -- Allow access to action when building HTML responses.
   --
   instance (MonadAction m) => MonadAction (HtmlT m)
+
+
+  -- |
+  -- Simple monad transformer to add 'MonadAction' to a transformer
+  -- stack. Makes use of 'ReaderT' under the wraps.
+  --
+  newtype ActionT m a
+    = ActionT
+      { stack          :: ReaderT ActionEnv m a
+      }
+    deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadFix
+             , MonadFail
+             , Contravariant
+             , MonadZip
+             , Alternative
+             , MonadPlus
+             , MonadIO
+             , MonadUnliftIO
+             , MonadTrans
+             )
+
+  instance (MonadIO m) => MonadAction (ActionT m) where
+    askActionEnv = ActionT ask
+    {-# INLINE askActionEnv #-}
+
+
+  runActionT :: ActionEnv -> ActionT m a -> m a
+  runActionT env ActionT{stack} = runReaderT stack env
+  {-# INLINE runActionT #-}
 
 
   -- |
@@ -195,7 +229,7 @@ where
   --
   getActionField :: (MonadAction m) => (ActionEnv -> IORef a) -> m a
   getActionField field = do
-    ref <- field <$> getActionEnv
+    ref <- field <$> askActionEnv
     readIORef ref
 
 
@@ -204,7 +238,7 @@ where
   --
   setActionField :: (MonadAction m) => (ActionEnv -> IORef a) -> a -> m ()
   setActionField field value = do
-    ref <- field <$> getActionEnv
+    ref <- field <$> askActionEnv
     writeIORef ref value
 
 
@@ -214,7 +248,7 @@ where
   modifyActionField :: (MonadAction m)
                     => (ActionEnv -> IORef a) -> (a -> a) -> m ()
   modifyActionField field fn = do
-    ref <- field <$> getActionEnv
+    ref <- field <$> askActionEnv
     modifyIORef' ref fn
 
 
@@ -322,7 +356,7 @@ where
   -- Obtain the original 'Request'.
   --
   getRequest :: (MonadAction m) => m Request
-  getRequest = (.aeRequest) <$> getActionEnv
+  getRequest = (.aeRequest) <$> askActionEnv
 
 
   -- |
@@ -590,7 +624,7 @@ where
   getBodyChunkIO :: (MonadAction m) => m (IO ByteString)
   getBodyChunkIO = do
     limit    <- getActionField (.aeBodyLimit)
-    counter  <- (.aeBodyCounter) <$> getActionEnv
+    counter  <- (.aeBodyCounter) <$> askActionEnv
     getChunk <- getRequestBodyChunk <$> getRequest
 
     return do
