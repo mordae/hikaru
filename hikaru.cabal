@@ -71,6 +71,7 @@ library
         lucid >=2.9,
         praha >=0.1,
         praha-config >=0.1,
+        praha-logger >=0.1,
         resourcet >=1.2,
         text >=1.2,
         time >=1.9,

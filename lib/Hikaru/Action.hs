@@ -116,6 +116,7 @@ module Hikaru.Action
   )
 where
   import Praha
+  import Praha.Logger
 
   import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
@@ -194,6 +195,7 @@ where
              , MonadIO
              , MonadUnliftIO
              , MonadTrans
+             , MonadLogger
              )
 
   instance (MonadIO m) => MonadAction (ActionT m) where
