@@ -90,13 +90,15 @@ where
   -- |
   -- Apply the information from the route to the handler.
   --
-  -- Namely, set 'hVary' as needed.
+  -- Namely, set 'hVary' as needed and 'hCacheControl' to @no-cache@.
   --
   seedHandler :: (MonadAction m) => Route ts a -> m ()
   seedHandler r = do
     case routeVary r of
       [] -> return ()
       hs -> setHeader hVary (intercalate ", " hs)
+
+    setHeader hCacheControl "no-cache"
 
 
   -- |
