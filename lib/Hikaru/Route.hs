@@ -169,6 +169,15 @@ where
 
   instance NFData Appraisal
 
+  instance Semigroup Appraisal where
+    Appraisal s1 v1 <> Appraisal s2 v2
+      = Appraisal { score = \req -> s1 req <> s2 req
+                  , vary  = nub (v1 <> v2)
+                  }
+
+  instance Monoid Appraisal where
+    mempty = Appraisal { score = \_ -> Suitable 1.0, vary = [] }
+
 
   type family RouteElim (r :: Type) (ts :: [Type]) where
     RouteElim r (t ': ts) = t -> RouteElim r ts
