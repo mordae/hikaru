@@ -31,9 +31,10 @@ module Hikaru.Dispatch
 where
   import Praha hiding (curry)
 
-  import Hikaru.Action (abortMiddleware)
+  import Hikaru.Action hiding (respond)
   import Hikaru.Route
 
+  import Data.ByteString (intercalate)
   import Data.List (sortOn, reverse, lookup)
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
@@ -74,16 +75,28 @@ where
   -- All routes are tried and scored for every request,
   -- preferring the earlier one in case of a tie.
   --
-  route :: Route (ts :: [Type]) h -> Dispatch h ()
+  route :: (MonadAction h) => Route (ts :: [Type]) (h a) -> Dispatch (h a) ()
   route r = Dispatch do
     let r' req = case routeApply (pathInfo req) r of
-                   Just h  -> Just (h, routeScore req r)
+                   Just h  -> Just (seedHandler r >> h, routeScore req r)
                    Nothing -> Nothing
 
     -- Routes must be prepended since we will later sort them and
     -- reverse the order, making the earlier matching routes come
     -- out first.
     modify \e@Env{..} -> e { routes = r' : routes }
+
+
+  -- |
+  -- Apply the information from the route to the handler.
+  --
+  -- Namely, set 'hVary' as needed.
+  --
+  seedHandler :: (MonadAction m) => Route ts a -> m ()
+  seedHandler r = do
+    case routeVary r of
+      [] -> return ()
+      hs -> setHeader hVary (intercalate ", " hs)
 
 
   -- |

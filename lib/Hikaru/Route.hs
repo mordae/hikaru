@@ -35,6 +35,7 @@ module Hikaru.Route
   , acceptContent
   , acceptForm
   , acceptJSON
+  , varyOn
 
     -- ** Response Content
   , offerContent
@@ -59,6 +60,7 @@ where
   import Hikaru.Media
   import Hikaru.Types
 
+  import Data.CaseInsensitive (original)
   import Data.HVect hiding (reverse)
   import Data.List (nub, reverse, lookup)
   import Data.Typeable (TypeRep, typeRep)
@@ -97,7 +99,7 @@ where
       { path           :: [PathInfo]
       , func           :: [Text] -> Maybe a
       , score          :: [Request -> Score]
-      , vary           :: [HeaderName]
+      , vary           :: [ByteString]
       }
     deriving (Generic)
 
@@ -161,7 +163,7 @@ where
   data Appraisal
     = Appraisal
       { score          :: Request -> Score
-      , vary           :: [HeaderName]
+      , vary           :: [ByteString]
       }
     deriving (Generic)
 
@@ -271,7 +273,7 @@ where
   -- Varies with 'hUpgrade'.
   --
   requireWebsocket :: Appraisal
-  requireWebsocket = Appraisal {vary = [hUpgrade], score}
+  requireWebsocket = Appraisal {vary = ["Upgrade"], score}
     where
       score req = if isWebSocketsReq req
                      then Suitable 1.0
@@ -310,7 +312,7 @@ where
   -- |
   -- Get list of all headers 'routeScore' would use.
   --
-  routeVary :: Route ts a -> [HeaderName]
+  routeVary :: Route ts a -> [ByteString]
   routeVary Route{vary} = vary
 
 
@@ -348,7 +350,7 @@ where
   -- Varies with 'hContentType'.
   --
   acceptContent :: [Media] -> Appraisal
-  acceptContent media = Appraisal {vary = [hContentType], score}
+  acceptContent media = Appraisal {vary = ["Content-Type"], score}
     where
       score req = do
         case parseMedia (cs $ getContentType req) of
@@ -389,13 +391,20 @@ where
 
 
   -- |
+  -- Vary on the given header.
+  --
+  varyOn :: HeaderName -> Appraisal
+  varyOn h = Appraisal { vary = [original h], score = \_ -> Suitable 1.0 }
+
+
+  -- |
   -- Check that we can send an acceptable response to the client and
   -- fail with 'NotAcceptable' if not.
   --
   -- Varies with 'hAccept'.
   --
   offerContent :: [Media] -> Appraisal
-  offerContent media = Appraisal {vary = [hAccept], score}
+  offerContent media = Appraisal {vary = ["Accept"], score}
     where
       score req = do
         case parseMedia (cs $ getAccept req) of
@@ -445,7 +454,7 @@ where
   -- Varies with 'hAcceptEncoding'.
   --
   offerEncoding :: [Media] -> Appraisal
-  offerEncoding media = Appraisal {vary = [hAcceptEncoding], score}
+  offerEncoding media = Appraisal {vary = ["Accept-Encoding"], score}
     where
       score req = do
         case parseMedia (cs $ getAcceptEncoding req) of
@@ -462,7 +471,7 @@ where
   -- Varies with 'hAcceptLanguage'.
   --
   offerLanguage :: [Media] -> Appraisal
-  offerLanguage media = Appraisal {vary = [hAcceptLanguage], score}
+  offerLanguage media = Appraisal {vary = ["Accept-Language"], score}
     where
       score req = do
         case parseMedia (cs $ getAcceptLanguage req) of
