@@ -14,6 +14,7 @@
 module Hikaru.Link
   ( rhref
   , rhref_
+  , qhref_
   , updateQuery
   , isActiveRoute
   )
@@ -57,8 +58,8 @@ where
   -- Example:
   --
   -- @
-  -- qs <- updateQuery [("conv", "upper")]
-  -- 'a_' ['rhref_' getEchoR "Hi" qs] ...
+  -- qs <- updateQuery ["conv" .= "upper"]
+  -- a_ [rhref_ getEchoR "Hi" qs] ...
   -- @
   --
   rhref_ :: (HasRep ts, AllHave Param ts)
@@ -74,14 +75,30 @@ where
 
   buildLink :: (AllHave Param ts)
             => Route ts a -> HVect ts -> [(Text, Text)] -> Text
-  buildLink route xs qs = cs (toLazyByteString (path <> query))
+  buildLink route xs qs = cs (toLazyByteString (path <> toQuery qs))
     where
       path = case routeLinkHVect route xs of
                [] -> "/"
                ps -> encodePathSegments ps
 
-      query = renderQueryBuilder True $
-                flip map qs \(n, v) -> (cs n, Just (cs v))
+
+  -- |
+  -- Used with Lucid to set href from a textual URL and a query string.
+  --
+  -- Can be combined with 'updateQuery' like this:
+  --
+  -- @
+  -- qs <- updateQuery ["lang" .= "en"]
+  -- a_ [qhref_ "" qs]
+  -- @
+  --
+  qhref_ :: Text -> [(Text, Text)] -> Attribute
+  qhref_ url qs = href_ (url <> cs (toLazyByteString (toQuery qs)))
+
+
+  toQuery :: [(Text, Text)] -> Builder
+  toQuery qs = renderQueryBuilder True qs'
+    where qs' = flip map qs \(n, v) -> (cs n, Just (cs v))
 
 
   -- |
