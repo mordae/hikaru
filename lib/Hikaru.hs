@@ -23,6 +23,7 @@ module Hikaru
   , module Hikaru.Media
   , module Hikaru.Route
   , module Hikaru.Types
+  , module Hikaru.Widget
 
   -- * Re-exported from "Network.Wai":
   , Application
@@ -45,6 +46,7 @@ where
   import Hikaru.Media
   import Hikaru.Route
   import Hikaru.Types
+  import Hikaru.Widget
 
   import Network.Wai
   import Network.HTTP.Types
