@@ -38,7 +38,7 @@ where
     deriving (Functor, Applicative, Monad, MonadIO)
 
   instance MonadAction Action where
-    getActionEnv = Action ((.demoActionEnv) <$> ask)
+    askActionEnv = Action ((.demoActionEnv) <$> ask)
 
   instance MonadModel Action where
     getModelEnv = Action ((.demoModelEnv) <$> ask)
@@ -268,17 +268,17 @@ where
     case ctrlType of
       "select" -> do
         select_ [name_ ctrlName, id_ ctrlName] do
-          mapM_ (choice_ ctrlValues) ctrlChoices
+          mapM_ (choice_ $ fromMaybe [] ctrlValues) ctrlChoices
 
       "multiselect" -> do
         select_ [name_ ctrlName, id_ ctrlName, multiple_ "multiple"] do
-          mapM_ (choice_ ctrlValues) ctrlChoices
+          mapM_ (choice_ $ fromMaybe [] ctrlValues) ctrlChoices
 
       "textarea" -> do
         textarea_ [name_ ctrlName, id_ ctrlName] do
           case ctrlValues of
-            text:_ -> toHtml text
-            _else  -> ""
+            Just (text:_) -> toHtml text
+            _otherwise    -> ""
 
       _other -> do
         ph <- lc ctrlPlaceholder
@@ -287,8 +287,8 @@ where
                , name_ ctrlName
                , placeholder_ ph
                , value_ case ctrlValues of
-                          text:_ -> text
-                          _else  -> ""
+                          Just (text:_) -> text
+                          _otherwise    -> ""
                ]
 
 

@@ -118,7 +118,7 @@ where
       , ctrlChoices     :: [(l, Text)]
         -- ^ Possible choices for controls that support them.
 
-      , ctrlValues      :: [Text]
+      , ctrlValues      :: Maybe [Text]
         -- ^
         -- Parsed values from the request data. Usually only the first one
         -- is used, but some controls (e.g. 'multiselect') use more.
@@ -267,9 +267,9 @@ where
         -> [Trait l m a]               -- ^ List of traits to apply
         -> FormT l m (Maybe a)         -- ^ Maybe the submitted value
   input name label default_ traits = do
-    (text, value0) <- getMaybeTextValue name
-    let ctrl0 = makeControl "text" name (Just label) (maybeToList text)
-    addControl ctrl0 value0 default_ traits
+    (texts, value) <- getMaybeTextsValue name
+    let ctrl = makeControl "text" name (Just label) texts
+    addControl ctrl value default_ traits
 
 
   -- |
@@ -287,9 +287,9 @@ where
          -> [Trait l m a]              -- ^ List of traits to apply
          -> FormT l m (Maybe a)        -- ^ Maybe the submitted value
   select name label default_ traits = do
-    (text, value0) <- getMaybeTextValue name
-    let ctrl0 = makeControl "select" name (Just label) (maybeToList text)
-    addControl ctrl0 value0 default_ traits
+    (texts, value) <- getMaybeTextsValue name
+    let ctrl = makeControl "select" name (Just label) texts
+    addControl ctrl value default_ traits
 
 
   -- |
@@ -308,9 +308,9 @@ where
               -> [Trait l m [a]]       -- ^ List of traits to apply
               -> FormT l m (Maybe [a]) -- ^ Maybe the submitted choices
   multiselect name label default_ traits = do
-    (texts, values0) <- getMaybeTextsValues name
-    let ctrl0 = makeControl "multiselect" name (Just label) (fromMaybe [] texts)
-    addControl ctrl0 values0 default_ traits
+    (texts, values) <- getMaybeTextsValues name
+    let ctrl = makeControl "multiselect" name (Just label) texts
+    addControl ctrl values default_ traits
 
 
   -- |
@@ -328,9 +328,9 @@ where
            -> [Trait l m a]            -- ^ List of traits to apply
            -> FormT l m (Maybe a)      -- ^ Maybe the submitted value
   textarea name label default_ traits = do
-    (text, value0) <- getMaybeTextValue name
-    let ctrl0 = makeControl "textarea" name (Just label) (maybeToList text)
-    addControl ctrl0 value0 default_ traits
+    (texts, value) <- getMaybeTextsValue name
+    let ctrl = makeControl "textarea" name (Just label) texts
+    addControl ctrl value default_ traits
 
 
   -- |
@@ -347,9 +347,9 @@ where
          -> [Trait l m Bool]           -- ^ List of traits to apply
          -> FormT l m Bool             -- ^ True when pressed
   button name label traits = do
-    (text, value0) <- getMaybeTextValue name
-    let ctrl0 = makeControl "button" name (Just label) (maybeToList text)
-    fromMaybe False <$> addControl ctrl0 value0 Nothing traits
+    (texts, value) <- getMaybeTextsValue name
+    let ctrl = makeControl "button" name (Just label) texts
+    fromMaybe False <$> addControl ctrl value Nothing traits
 
 
   -- |
@@ -366,12 +366,12 @@ where
          -> [Trait l m a]              -- ^ List of traits to apply
          -> FormT l m (Maybe a)        -- ^ Maybe the submitted value
   hidden name default_ traits = do
-    (text, value0) <- getMaybeTextValue name
-    let ctrl0 = makeControl "hidden" name Nothing (maybeToList text)
-    addControl ctrl0 value0 default_ traits
+    (texts, value) <- getMaybeTextsValue name
+    let ctrl = makeControl "hidden" name Nothing texts
+    addControl ctrl value default_ traits
 
 
-  makeControl :: Text -> Text -> Maybe l -> [Text] -> Control l
+  makeControl :: Text -> Text -> Maybe l -> Maybe [Text] -> Control l
   makeControl type_ name label values =
     Control { ctrlType = type_
             , ctrlName = name
@@ -396,20 +396,28 @@ where
       return value1
 
 
-  getMaybeTextValue :: (Monad m, Param a)
-                    => Text -> FormT l m (Maybe Text, Maybe a)
-  getMaybeTextValue name = do
+  getMaybeTextsValue :: (Monad m, Param a)
+                    => Text -> FormT l m (Maybe [Text], Maybe a)
+  getMaybeTextsValue name = do
     maybeFields <- FormT $ gets (.envFields)
-    let tvalue = lookup name =<< maybeFields
-    return (tvalue, fromParam =<< tvalue)
+
+    case maybeFields of
+      Nothing     -> return (Nothing, Nothing)
+      Just fields -> do
+        let tvalues = lookupMany name fields
+        return (Just tvalues, fromParam =<< listToMaybe tvalues)
 
 
   getMaybeTextsValues :: (Monad m, Param a)
                       => Text -> FormT l m (Maybe [Text], Maybe [a])
   getMaybeTextsValues name = do
     maybeFields <- FormT $ gets (.envFields)
-    let tvalues = lookupMany name <$> maybeFields
-    return $ (tvalues, mapM fromParam =<< tvalues)
+
+    case maybeFields of
+      Nothing     -> return (Nothing, Nothing)
+      Just fields -> do
+        let tvalues = lookupMany name fields
+        return (Just tvalues, mapM fromParam tvalues)
 
 
   lookupMany :: (Eq a) => a -> [(a, b)] -> [b]
@@ -465,8 +473,8 @@ where
        then return (value, ctrl)
        else do
          case ctrl.ctrlValues of
-           [] -> return (value, addNote' Danger msg ctrl)
-           __ -> return (value, ctrl)
+           Just [] -> return (value, addNote' Danger msg ctrl)
+           _else   -> return (value, ctrl)
 
 
   -- |
@@ -490,13 +498,16 @@ where
     if getSeverity ctrl >= Danger
        then return (value, ctrl)
        else do
-         result <- case value of
-                     Nothing  -> return True
-                     Just val -> test val
+         case ctrl.ctrlValues of
+           Nothing -> return (value, ctrl)
+           Just __ -> do
+             result <- case value of
+                         Nothing  -> return True
+                         Just val -> test val
 
-         if result
-            then return (value, ctrl)
-            else return (value, addNote' Danger msg ctrl)
+             if result
+                then return (value, ctrl)
+                else return (value, addNote' Danger msg ctrl)
 
 
   -- |
