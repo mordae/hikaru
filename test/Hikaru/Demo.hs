@@ -18,7 +18,6 @@ where
 
   import Data.Aeson (Value)
   import Data.Text (unlines)
-  import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import UnliftIO.MVar
@@ -147,8 +146,11 @@ where
 
         -- Present fancy HTML result.
         sendHTML do
-          h1_ "Welcome!"
-          p_ $ "You are " >> toHtml (tshow n) >> ". visitor!"
+          tag "h1" "" do
+            text "Welcome!"
+
+          tag "p" "" do
+            text $ mconcat [ "You are ", tshow n, ". visitor!" ]
 
 
   getRootTextR :: Route '[] Handler
@@ -188,14 +190,14 @@ where
   notFound :: Response -> Action ()
   notFound _resp = do
     setStatus status404
-    sendText $ "See: " <> rhref getRootHtmlR [("q", "404")]
+    sendText $ "See: " <> buildLink getRootHtmlR [("q", "404")]
 
 
   postCaseR :: Route '[] Handler
   postCaseR = post handle // "case" // "" /? acceptForm
     where
       handle = do
-        setLanguages ["en", "cs"]
+        selectLanguage "lang" "lang" "en"
 
         (res, form) <- postForm addCaseForm
 
@@ -203,100 +205,120 @@ where
           Nothing -> do
             setStatus status400
             sendHTML do
-              simpleForm_ form
+              simpleForm form
 
           Just ac -> do
             _case <- addCase ac
-            redirect (rhref getCasesR [])
+            redirect (buildLink getCasesR [])
 
 
   getCasesR :: Route '[] Handler
   getCasesR = get handle // "case" // "" /? offerHTML
     where
       handle = do
-        setHeader hCacheControl "no-store"
-        setLanguages ["en", "cs"]
+        selectLanguage "lang" "lang" "en"
 
         cases <- liftIO . readMVar . (.modelCases) =<< getModelEnv
 
         sendHTML do
-          h1_ "Cases"
+          tag "h1" "" do
+            text "Cases"
 
-          form_ [method_ "POST"] do
+          tag "form" "" do
+            attr [ "method" .= "POST" ]
+
             form <- newForm addCaseForm
-            simpleForm_ form
-            button_ [type_ "submit"] "Submit"
+            simpleForm form
 
-          table_ do
-            tr_ do
-              th_ "Id"
-              th_ "Name"
-              th_ "RecNo"
-              th_ "Mode"
-              th_ "Active"
+          tag "table" "" do
+            tag "tr" "" do
+              tag "th" "" $ text "Id"
+              tag "th" "" $ text "Name"
+              tag "th" "" $ text "RecNo"
+              tag "th" "" $ text "Mode"
+              tag "th" "" $ text "Active"
 
             forM cases \Case{..} -> do
-              tr_ do
-                td_ $ toHtml $ tshow caseId
-                td_ $ toHtml $ caseName
-                td_ $ toHtml $ caseRecNo
-                td_ $ toHtml $ tshow caseMode
-                td_ $ toHtml $ tshow caseActive
+              tag "tr" "" do
+                tag "td" "" $ text $ tshow caseId
+                tag "td" "" $ text $ caseName
+                tag "td" "" $ text $ caseRecNo
+                tag "td" "" $ text $ tshow caseMode
+                tag "td" "" $ text $ tshow caseActive
 
 
   -- Forms -------------------------------------------------------------------
 
 
-  simpleForm_ :: (MonadAction m, Localizable l) => Form l -> HtmlT m ()
-  simpleForm_ Form{..} = do
+  simpleForm :: (MonadAction m, Localizable l) => Form l -> HtmlT m ()
+  simpleForm Form{..} = do
     forM_ formControls \ctrl@Control{..} -> do
-      div_ do
-        div_ do
+      tag "div" "" do
+        tag "div" "" do
           case ctrlLabel of
             Nothing -> return ()
-            Just lb -> label_ [for_ ctrlName] $ lc_ lb
+            Just lb -> tag "label" "" do
+              attr [ "for" .= ctrlName ]
+              localizeHtml' lb
 
-        formControl_ ctrl
+        formControl ctrl
 
         forM_ ctrlNote \Note{..} -> do
-          p_ do
-            lc_ noteMessage
+          tag "p" "" do
+            localizeHtml' noteMessage
 
 
-  formControl_ :: (Localizable l, MonadAction m) => Control l -> HtmlT m ()
-  formControl_ Control{..} = do
+  formControl :: (Localizable l, MonadAction m) => Control l -> HtmlT m ()
+  formControl Control{..} = do
     case ctrlType of
       "select" -> do
-        select_ [name_ ctrlName, id_ ctrlName] do
-          mapM_ (choice_ $ fromMaybe [] ctrlValues) ctrlChoices
+        tag "select" "" do
+          attr [ "name" .= ctrlName
+               , "id"   .= ctrlName
+               ]
+          mapM_ (choice $ fromMaybe [] ctrlValues) ctrlChoices
 
       "multiselect" -> do
-        select_ [name_ ctrlName, id_ ctrlName, multiple_ "multiple"] do
-          mapM_ (choice_ $ fromMaybe [] ctrlValues) ctrlChoices
+        tag "select" "" do
+          attr [ "name"     .= ctrlName
+               , "id"       .= ctrlName
+               , "multiple" .= "multiple"
+               ]
+          mapM_ (choice $ fromMaybe [] ctrlValues) ctrlChoices
 
       "textarea" -> do
-        textarea_ [name_ ctrlName, id_ ctrlName] do
+        tag "textarea" "" do
+          attr [ "name" .= ctrlName
+               , "id"   .= ctrlName
+               ]
+
           case ctrlValues of
-            Just (text:_) -> toHtml text
-            _otherwise    -> ""
+            Just (t:_) -> text t
+            _otherwise -> return ()
 
       _other -> do
-        ph <- lc ctrlPlaceholder
+        ph <- localizeText' ctrlPlaceholder
 
-        input_ [ type_ ctrlType
-               , name_ ctrlName
-               , placeholder_ ph
-               , value_ case ctrlValues of
-                          Just (text:_) -> text
-                          _otherwise    -> ""
+        tag "input" "" do
+          attr [ "type"        .= ctrlType
+               , "name"        .= ctrlName
+               , "id"          .= ctrlName
+               , "placeholder" .= ph
+               , "value"       .= case ctrlValues of
+                                    Just (t:_) -> t
+                                    _otherwise -> ""
                ]
 
 
-  choice_ :: (MonadAction m, Localizable l) => [Text] -> (l, Text) -> HtmlT m ()
-  choice_ selected (l, v) = do
-    if v `elem` selected
-       then option_ [selected_ "selected", value_ v] $ lc_ l
-       else option_ [value_ v] $ lc_ l
+  choice :: (MonadAction m, Localizable l) => [Text] -> (l, Text) -> HtmlT m ()
+  choice selected (l, v) = do
+    tag "option" "" do
+      attr [ "value" .= v ]
+
+      when (v `elem` selected) do
+        attr [ "selected" .= "" ]
+
+      localizeHtml' l
 
 
   data Case
@@ -350,21 +372,21 @@ where
     deriving (Show)
 
   instance Localizable Messages where
-    localize "en" MsgCaseName    = Just "Name"
-    localize "en" MsgCaseMode    = Just "Mode"
-    localize "en" MsgCaseEnabled = Just "Enabled"
-    localize "en" MsgCaseRecNo   = Just "Record #"
-    localize "en" MsgSubmit      = Just "Submit"
+    localizeText "en" MsgCaseName    = "Name"
+    localizeText "en" MsgCaseMode    = "Mode"
+    localizeText "en" MsgCaseEnabled = "Enabled"
+    localizeText "en" MsgCaseRecNo   = "Record #"
+    localizeText "en" MsgSubmit      = "Submit"
 
-    localize "en" MsgRequired    = Just "This field is required."
+    localizeText "en" MsgRequired    = "This field is required."
 
-    localize "en" (MsgAccessMode ModePublic)  = Just "Public"
-    localize "en" (MsgAccessMode ModePrivate) = Just "Private"
+    localizeText "en" (MsgAccessMode ModePublic)  = "Public"
+    localizeText "en" (MsgAccessMode ModePrivate) = "Private"
 
-    localize "en" (MsgBool True)  = Just "True"
-    localize "en" (MsgBool False) = Just "False"
+    localizeText "en" (MsgBool True)  = "True"
+    localizeText "en" (MsgBool False) = "False"
 
-    localize _lang _msg          = Nothing
+    localizeText _lng msg = localizeText "en" msg
 
 
   addCaseForm :: (MonadAction m) => FormT Messages m (Maybe AddCase)

@@ -19,7 +19,7 @@ module Hikaru.Widget
 where
   import Praha
 
-  import Lucid
+  import Hikaru.HTML
 
 
   -- |

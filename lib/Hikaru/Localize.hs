@@ -59,17 +59,18 @@
 module Hikaru.Localize
   ( Locale
   , Localizable(..)
-  , lc
-  , lc_
-  , selectLanguages
+  , localizeText'
+  , localizeHtml'
+  , selectLanguage
   )
 where
   import Praha
 
-  import Data.List (filter, map, nub)
   import Hikaru.Action
+  import Hikaru.HTML
   import Hikaru.Media
-  import Lucid
+
+  import Data.List (filter, map, sortOn, reverse)
 
 
   -- |
@@ -86,18 +87,17 @@ where
   class (Show l) => Localizable l where
     -- |
     -- Try to localize the message using given locale.
-    -- Return 'Nothing' if the locale is not supported.
     --
-    localize :: Locale -> l -> Maybe Text
-    localize _lang _msg = Nothing
-    {-# INLINE localize #-}
+    localizeText :: Locale -> l -> Text
+    localizeText _lang msg = tshow msg
+    {-# INLINE localizeText #-}
 
     -- |
     -- Same as 'localize', but for HTML.
     -- Defaults to using the plain 'localize'.
     --
-    localizeHtml :: (Monad m) => Locale -> l -> Maybe (HtmlT m ())
-    localizeHtml lang = fmap toHtml . localize lang
+    localizeHtml :: (MonadIO m) => Locale -> l -> HtmlT m ()
+    localizeHtml lang msg = text (localizeText lang msg)
     {-# INLINE localizeHtml #-}
 
 
@@ -106,67 +106,61 @@ where
   -- gradual localization.
   --
   instance Localizable Text where
-    localize _lc = Just
-    {-# INLINE localize #-}
+    localizeText _lc msg = msg
+    {-# INLINE localizeText #-}
 
 
   -- |
   -- Instance to make 'Maybe' values simpler to render localized.
   --
   instance Localizable l => Localizable (Maybe l) where
-    localize lang (Just msg) = localize lang msg
-    localize _ Nothing       = Just ""
-    {-# INLINE localize #-}
+    localizeText lang (Just msg) = localizeText lang msg
+    localizeText _ Nothing       = ""
+    {-# INLINE localizeText #-}
 
 
   -- |
   -- Localize given message to the language indicated by the
-  -- 'getLanguages' of the current action. Uses 'localize' internaly.
+  -- 'getLanguage' of the current action. Uses 'localizeText'.
   --
-  lc :: (MonadAction m, Localizable l) => l -> m Text
-  lc msg = do
-    langs <- getLanguages
-
-    case mapMaybe (flip localize msg) langs of
-      []  -> return $ tshow msg
-      x:_ -> return x
+  localizeText' :: (MonadAction m, Localizable l) => l -> m Text
+  localizeText' msg = do
+    lang <- getLanguage
+    return $ localizeText lang msg
 
 
   -- |
   -- Localize given message to the language indicated by the
-  -- 'getLanguages' of the current action.
+  -- 'getLanguage' of the current action. Uses 'localizeHtml'.
   --
-  lc_ :: (MonadAction m, Localizable l) => l -> HtmlT m ()
-  lc_ msg = do
-    langs <- getLanguages
-
-    case mapMaybe (flip localizeHtml msg) langs of
-      []  -> toHtml $ tshow msg
-      x:_ -> x
+  localizeHtml' :: (MonadAction m, Localizable l) => l -> HtmlT m ()
+  localizeHtml' msg = do
+    lang <- getLanguage
+    localizeHtml lang msg
 
 
   -- |
-  -- Determine preferred language order using a parameter, cookie
+  -- Determine preferred language using a parameter, cookie
   -- and finally the @Accept-Language@ header items.
   --
   -- If the parameter is present, also set the cookie so that the
-  -- primary language preference persists across multiple page loads.
+  -- language preference persists across multiple page loads.
   --
-  selectLanguages :: (MonadAction m) => Text -> Text -> m ()
-  selectLanguages paramName cookieName = do
+  selectLanguage :: (MonadAction m) => Text -> Text -> Text -> m ()
+  selectLanguage paramName cookieName fallback = do
     preferred <- getParamMaybe paramName
     previous  <- getCookieMaybe cookieName
     acceptable <- getAcceptLanguage
                   <&> filter ((> 0) . (.quality))
+                  <&> sortOn (.quality)
+                  <&> reverse
                   <&> map (.mainType)
 
     case preferred of
       Nothing   -> return ()
-      Just lang -> setCookie cookieName (cs lang)
+      Just lang -> setCookie cookieName lang
 
-    setLanguages $ nub $ maybeToList preferred
-                         <> maybeToList previous
-                         <> acceptable
+    setLanguage $ fromMaybe fallback $ preferred <|> previous <|> listToMaybe acceptable
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

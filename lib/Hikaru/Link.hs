@@ -12,23 +12,23 @@
 --
 
 module Hikaru.Link
-  ( rhref
-  , rhref_
-  , qhref_
+  ( buildLink
   , updateQuery
+  , rhref
+  , qhref
   , isActiveRoute
   )
 where
   import Praha hiding (curry)
 
   import Hikaru.Action
+  import Hikaru.HTML
   import Hikaru.Route
   import Hikaru.Types
 
   import Data.Binary.Builder
   import Data.HVect
   import Data.List (map, filter)
-  import Lucid
   import Network.HTTP.Types.URI
 
 
@@ -41,64 +41,61 @@ where
   -- >>> rhref getEchoR "Hi" [("q", "42")]
   -- "/echo/Hi?q=42"
   --
-  rhref :: (HasRep ts, AllHave Param ts)
-        => Route ts a
-        -> HVectElim ts ([(Text, Text)] -> Text)
-  rhref route = curry (hvRhref route)
+  buildLink :: (HasRep ts, AllHave Param ts)
+            => Route ts a
+            -> HVectElim ts ([(Text, Text)] -> Text)
+  buildLink route = curry (buildLink' route)
 
 
-  hvRhref :: (AllHave Param ts)
-          => Route ts a -> HVect ts -> [(Text, Text)] -> Text
-  hvRhref route xs qs = buildLink route xs qs
-
-
-  -- |
-  -- Similar to 'rhref', but inteded to be used with Lucid.
-  --
-  -- Example:
-  --
-  -- @
-  -- qs <- updateQuery ["conv" .= "upper"]
-  -- a_ [rhref_ getEchoR "Hi" qs] ...
-  -- @
-  --
-  rhref_ :: (HasRep ts, AllHave Param ts)
-         => Route ts a
-         -> HVectElim ts ([(Text, Text)] -> Attribute)
-  rhref_ route = curry (hvRhref_ route)
-
-
-  hvRhref_ :: (AllHave Param ts)
-           => Route ts a -> HVect ts -> [(Text, Text)] -> Attribute
-  hvRhref_ route xs qs = href_ (buildLink route xs qs)
-
-
-  buildLink :: (AllHave Param ts)
-            => Route ts a -> HVect ts -> [(Text, Text)] -> Text
-  buildLink route xs qs = cs (toLazyByteString (path <> toQuery qs))
+  buildLink' :: (AllHave Param ts)
+             => Route ts a -> HVect ts -> [(Text, Text)] -> Text
+  buildLink' route xs qs = cs (toLazyByteString (path <> toQuery qs))
     where
       path = case routeLinkHVect route xs of
                [] -> "/"
                ps -> encodePathSegments ps
 
 
+  toQuery :: [(Text, Text)] -> Builder
+  toQuery qs = renderQueryBuilder True qs'
+    where qs' = flip map qs \(n, v) -> (cs n, Just (cs v))
+
+
   -- |
-  -- Used with Lucid to set href from a textual URL and a query string.
+  -- Uses 'rhref' to set HTML 'attr' @href@.
+  --
+  -- Example:
+  --
+  -- @
+  -- qs <- updateQuery [\"conv\" .= \"upper\"]
+  -- 'tag' \"a\" \"\" do
+  --   rhref getEchoR \"Hi\" qs
+  --   text \"upper\"
+  -- @
+  --
+  rhref :: forall ts m a. (AllHave Param ts, HasRep ts, MonadIO m)
+        => Route ts a -> HVectElim ts ([(Text, Text)] -> HtmlT m ())
+  rhref route = curry ((rhref' :: Route ts a -> HVect ts -> [(Text, Text)] -> HtmlT m ()) route)
+
+
+  rhref' :: (MonadIO m, AllHave Param ts)
+         => Route ts a -> HVect ts -> [(Text, Text)] -> HtmlT m ()
+  rhref' route xs qs = attr [ "href" .= (buildLink' route xs qs) ]
+
+
+  -- |
+  -- Used to set href from a textual URL and a query string.
   --
   -- Can be combined with 'updateQuery' like this:
   --
   -- @
-  -- qs <- updateQuery ["lang" .= "en"]
-  -- a_ [qhref_ "" qs]
+  -- 'tag' \"a\" \"\" do
+  --   qhref \"\" [ \"lang\" .= \"en\" ]
+  --   text \"English\"
   -- @
   --
-  qhref_ :: Text -> [(Text, Text)] -> Attribute
-  qhref_ url qs = href_ (url <> cs (toLazyByteString (toQuery qs)))
-
-
-  toQuery :: [(Text, Text)] -> Builder
-  toQuery qs = renderQueryBuilder True qs'
-    where qs' = flip map qs \(n, v) -> (cs n, Just (cs v))
+  qhref :: (MonadIO m) => Text -> [(Text, Text)] -> HtmlT m ()
+  qhref url qs = attr [ "href" .= (url <> cs (toLazyByteString (toQuery qs))) ]
 
 
   -- |

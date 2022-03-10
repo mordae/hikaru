@@ -28,17 +28,18 @@ source-repository head
 library
     exposed-modules:
         Hikaru
-        Hikaru.Develop
         Hikaru.Action
         Hikaru.CSRF
+        Hikaru.Develop
         Hikaru.Dispatch
-        Hikaru.Widget
         Hikaru.Form
+        Hikaru.HTML
         Hikaru.Link
         Hikaru.Localize
         Hikaru.Media
         Hikaru.Route
         Hikaru.Types
+        Hikaru.Widget
 
     hs-source-dirs:     lib
     other-modules:      Paths_hikaru
@@ -68,7 +69,7 @@ library
         HsOpenSSL >=0.11,
         http-types >=0.12,
         hvect >=0.4,
-        lucid >=2.9,
+        blaze-builder >=0.4,
         praha >=0.1,
         praha-config >=0.1,
         praha-logger >=0.1,
@@ -121,7 +122,6 @@ test-suite spec
         hspec,
         http-types >=0.12,
         hvect >=0.4,
-        lucid >=2.9,
         praha >=0.1,
         praha-config >=0.1,
         resourcet >=1.2,

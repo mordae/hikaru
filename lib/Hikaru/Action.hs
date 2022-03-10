@@ -95,8 +95,8 @@ module Hikaru.Action
   , abortMiddleware
 
   -- ** Localization
-  , getLanguages
-  , setLanguages
+  , getLanguage
+  , setLanguage
 
   -- ** Cacheing
   , withCache
@@ -118,6 +118,10 @@ where
   import Praha
   import Praha.Logger
 
+  import Hikaru.HTML (fromHtmlT, HtmlT)
+  import Hikaru.Media
+  import Hikaru.Types
+
   import qualified Data.ByteString as BS
   import qualified Data.ByteString.Lazy as LBS
   import qualified Data.Map.Strict as Map
@@ -131,9 +135,6 @@ where
   import Data.CaseInsensitive (mk)
   import Data.Dynamic
   import Data.List (deleteBy, lookup, map, filter)
-  import Hikaru.Media
-  import Hikaru.Types
-  import Lucid
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
@@ -267,7 +268,7 @@ where
       , aeFinalize     :: !(IORef (IO ()))
       , aeBodyLimit    :: !(IORef Int64)
       , aeBodyCounter  :: !(IORef Int64)
-      , aeLanguages    :: !(IORef [Text])
+      , aeLanguage     :: !(IORef Text)
       , aeCache        :: !(IORef (Map.Map Text Dynamic))
       , aeMsgLimit     :: !(IORef Int64)
       , aeFrameLimit   :: !(IORef Int64)
@@ -343,7 +344,7 @@ where
     aeFinalize    <- newIORef (return ())
     aeBodyLimit   <- newIORef (10 * 1024 * 1024)
     aeBodyCounter <- newIORef 0
-    aeLanguages   <- newIORef []
+    aeLanguage    <- newIORef "en"
     aeCache       <- newIORef Map.empty
     aeMsgLimit    <- newIORef (1 * 1024 * 1024)
     aeFrameLimit  <- newIORef (1 * 1024 * 1024)
@@ -994,7 +995,7 @@ where
   sendHTML :: (MonadAction m) => HtmlT m a -> m ()
   sendHTML html = do
     defaultHeader hContentType "text/html; charset=utf8"
-    builder <- execHtmlT html
+    builder <- fromHtmlT html
     setResponseBS (toLazyByteString builder)
 
 
@@ -1276,23 +1277,22 @@ where
 
 
   -- |
-  -- Get list of languages in order of their preference to be used
-  -- for localization.
+  -- Get the preferred language to be used for localization.
   --
-  -- Languages must be set using the 'setLanguages' function or through
+  -- Language must be set using the 'setLanguage' function or through
   -- the localization tools found in the "Hikaru.Localize" module.
   --
-  getLanguages :: (MonadAction m) => m [Text]
-  getLanguages = getActionField (.aeLanguages)
+  getLanguage :: (MonadAction m) => m Text
+  getLanguage = getActionField (.aeLanguage)
 
 
   -- |
-  -- Set list of localization languages.
+  -- Set preferred language to be used for localization.
   --
-  -- See 'getLanguages' above for more information.
+  -- See 'getLanguage' above for more information.
   --
-  setLanguages :: (MonadAction m) => [Text] -> m ()
-  setLanguages = setActionField (.aeLanguages)
+  setLanguage :: (MonadAction m) => Text -> m ()
+  setLanguage = setActionField (.aeLanguage)
 
 
   -- Cacheing ----------------------------------------------------------------

@@ -18,6 +18,7 @@ module Hikaru
   , module Hikaru.Develop
   , module Hikaru.Dispatch
   , module Hikaru.Form
+  , module Hikaru.HTML
   , module Hikaru.Link
   , module Hikaru.Localize
   , module Hikaru.Media
@@ -41,6 +42,7 @@ where
   import Hikaru.Develop
   import Hikaru.Dispatch
   import Hikaru.Form
+  import Hikaru.HTML
   import Hikaru.Link
   import Hikaru.Localize
   import Hikaru.Media

@@ -93,7 +93,7 @@ where
         runDemo do
           let payload = "active=lol"
           let mime = "application/x-www-form-urlencoded"
-          resp <- post "/case/" [(hContentType, mime)] payload
+          resp <- post "/case/?lang=XX" [(hContentType, mime)] payload
           assertStatus 400 resp
           assertBodyContains "This field is required." resp
 
