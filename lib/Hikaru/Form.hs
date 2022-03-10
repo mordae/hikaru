@@ -33,7 +33,6 @@ module Hikaru.Form
   , Control(..)
   , Note(..)
   , getHintMaybe
-  , getSeverity
 
   -- * Building Forms
   , FormT
@@ -123,8 +122,8 @@ where
         -- Parsed values from the request data. Usually only the first one
         -- is used, but some controls (e.g. 'multiselect') use more.
 
-      , ctrlNotes       :: [Note l]
-        -- ^ Notes resulting from validation or added manually.
+      , ctrlNote       :: Maybe (Note l)
+        -- ^ Note resulting from validation or added manually.
 
       , ctrlHints       :: [(Text, Dynamic)]
         -- ^ Arbitrary rendering hints.
@@ -152,14 +151,6 @@ where
   --
   getHintMaybe :: (Typeable a) => Text -> Control l -> Maybe a
   getHintMaybe k Control{ctrlHints} = fromDynamic =<< lookup k ctrlHints
-
-
-  -- |
-  -- Calculate highest severity of all control notes.
-  -- Useful to determine e.g. how to color the input field.
-  --
-  getSeverity :: Control l -> Severity
-  getSeverity Control{ctrlNotes} = mconcat $ map (.noteSeverity) ctrlNotes
 
 
   -- Building Forms ----------------------------------------------------------
@@ -379,7 +370,7 @@ where
             , ctrlPlaceholder = Nothing
             , ctrlChoices = []
             , ctrlValues = values
-            , ctrlNotes = []
+            , ctrlNote = Nothing
             , ctrlHints = []
             }
 
@@ -469,12 +460,12 @@ where
   --
   required :: (Monad m) => l -> Trait l m a
   required msg (value, ctrl) = do
-    if getSeverity ctrl >= Danger
-       then return (value, ctrl)
-       else do
-         case ctrl.ctrlValues of
-           Just [] -> return (value, addNote' Danger msg ctrl)
-           _else   -> return (value, ctrl)
+    case ctrl.ctrlNote of
+      Just (Note Danger _) -> return (value, ctrl)
+      _else -> do
+        case ctrl.ctrlValues of
+          Just [] -> return (value, addNote' Danger msg ctrl)
+          _else   -> return (value, ctrl)
 
 
   -- |
@@ -495,19 +486,19 @@ where
   --
   checkM :: (Monad m) => l -> (a -> m Bool) -> Trait l m a
   checkM msg test (value, ctrl) = do
-    if getSeverity ctrl >= Danger
-       then return (value, ctrl)
-       else do
-         case ctrl.ctrlValues of
-           Nothing -> return (value, ctrl)
-           Just __ -> do
-             result <- case value of
-                         Nothing  -> return True
-                         Just val -> test val
+    case ctrl.ctrlNote of
+      Just (Note Danger _) -> return (value, ctrl)
+      _else -> do
+        case ctrl.ctrlValues of
+          Nothing -> return (value, ctrl)
+          Just __ -> do
+            result <- case value of
+                        Nothing  -> return True
+                        Just val -> test val
 
-             if result
-                then return (value, ctrl)
-                else return (value, addNote' Danger msg ctrl)
+            if result
+               then return (value, ctrl)
+               else return (value, addNote' Danger msg ctrl)
 
 
   -- |
@@ -546,14 +537,23 @@ where
 
 
   -- |
-  -- Add a 'Note' to the @ctrlNotes@ field.
+  -- Add a 'Note' to the @ctrlNotes@ field, unless a note with same or
+  -- higher severity is already present.
   --
   addNote :: (Monad m) => Severity -> l -> Trait l m a
   addNote sev msg (value, ctrl) = return (value, addNote' sev msg ctrl)
 
 
   addNote' :: Severity -> l -> Control l -> Control l
-  addNote' sev msg ctrl = ctrl { ctrlNotes = ctrl.ctrlNotes <> [Note sev msg] }
+  addNote' sev1 msg1 ctrl =
+    case ctrl.ctrlNote of
+      Nothing ->
+        ctrl { ctrlNote = Just (Note sev1 msg1) }
+
+      Just (Note sev0 _) ->
+        if sev1 > sev0
+           then ctrl { ctrlNote = Just (Note sev1 msg1) }
+           else ctrl
 
 
   -- |

@@ -258,7 +258,7 @@ where
 
         formControl_ ctrl
 
-        forM_ ctrlNotes \Note{..} -> do
+        forM_ ctrlNote \Note{..} -> do
           p_ do
             lc_ noteMessage
 
