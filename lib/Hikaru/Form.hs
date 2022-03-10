@@ -198,14 +198,14 @@ where
   -- |
   -- Render form without any request data.
   --
-  newForm :: (MonadAction m) => FormT l m a -> m (Form l)
+  newForm :: (MonadAction m) => FormT l m (Maybe a) -> m (Form l)
   newForm form = execFormT Nothing form
 
 
   -- |
   -- Render form using GET query string parameters.
   --
-  getForm :: (MonadAction m) => FormT l m a -> m (a, Form l)
+  getForm :: (MonadAction m) => FormT l m (Maybe a) -> m (Maybe a, Form l)
   getForm form = do
     params <- getParams
     runFormT (Just (params, [])) form
@@ -214,7 +214,7 @@ where
   -- |
   -- Render form using POST form data.
   --
-  postForm :: (MonadAction m) => FormT l m a -> m (a, Form l)
+  postForm :: (MonadAction m) => FormT l m (Maybe a) -> m (Maybe a, Form l)
   postForm form = do
     formData <- getFormData
     runFormT (Just formData) form
@@ -223,21 +223,33 @@ where
   -- |
   -- Run form supplying the request data manually.
   --
-  runFormT :: (Monad m) => Maybe FormData -> FormT l m a -> m (a, Form l)
+  runFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a, Form l)
   runFormT fdata FormT{..} = fixup <$> runStateT unFormT env0
     where
-      fixup (res, env1) = (res, Form env1.envControls)
+      fixup (res, env1) = ( if hasDanger env1.envControls
+                               then Nothing
+                               else res
+                          , Form env1.envControls
+                          )
+
       env0 = Env { envControls = []
                  , envFields   = fmap fst fdata
                  , envFiles    = fmap snd fdata
                  }
 
 
-  evalFormT :: (Monad m) => Maybe FormData -> FormT l m a -> m a
+  hasDanger :: [Control l] -> Bool
+  hasDanger = any hasDanger'
+    where
+      hasDanger' Control{ctrlNote = Just (Note Danger _)} = True
+      hasDanger' _ = False
+
+
+  evalFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a)
   evalFormT fdata = fmap fst . runFormT fdata
 
 
-  execFormT :: (Monad m) => Maybe FormData -> FormT l m a -> m (Form l)
+  execFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Form l)
   execFormT fdata = fmap snd . runFormT fdata
 
 
