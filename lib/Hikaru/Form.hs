@@ -550,10 +550,15 @@ where
 
   -- |
   -- Add a 'Note' to the @ctrlNotes@ field, unless a note with same or
-  -- higher severity is already present.
+  -- higher severity is already present and the form is being validated.
+  --
+  -- Ideal for \"Looks good\" messages.
   --
   addNote :: (Monad m) => Severity -> l -> Trait l m a
-  addNote sev msg (value, ctrl) = return (value, addNote' sev msg ctrl)
+  addNote sev msg (value, ctrl) =
+    case ctrl.ctrlValues of
+      Nothing -> return (value, ctrl)
+      Just _  -> return (value, addNote' sev msg ctrl)
 
 
   addNote' :: Severity -> l -> Control l -> Control l
