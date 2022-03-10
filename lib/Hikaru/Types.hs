@@ -174,7 +174,6 @@ where
     {-# INLINE toParam #-}
 
   instance Param String where
-    fromParam "" = Nothing
     fromParam sp = Just (cs sp)
     {-# INLINE fromParam #-}
 
@@ -182,7 +181,6 @@ where
     {-# INLINE toParam #-}
 
   instance Param Text where
-    fromParam "" = Nothing
     fromParam sp = Just sp
     {-# INLINE fromParam #-}
 
@@ -190,7 +188,6 @@ where
     {-# INLINE toParam #-}
 
   instance Param Data.Text.Lazy.Text where
-    fromParam "" = Nothing
     fromParam sp = Just $ Data.Text.Lazy.fromStrict sp
     {-# INLINE fromParam #-}
 
@@ -198,7 +195,6 @@ where
     {-# INLINE toParam #-}
 
   instance Param Data.ByteString.ByteString where
-    fromParam "" = Nothing
     fromParam sp = Just $ Data.Text.Encoding.encodeUtf8 sp
     {-# INLINE fromParam #-}
 
@@ -207,7 +203,6 @@ where
     {-# INLINE toParam #-}
 
   instance Param Data.ByteString.Lazy.ByteString where
-    fromParam "" = Nothing
     fromParam sp = Just $ Data.ByteString.Lazy.fromStrict
                         $ Data.Text.Encoding.encodeUtf8 sp
     {-# INLINE fromParam #-}
