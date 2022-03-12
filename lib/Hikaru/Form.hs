@@ -74,12 +74,14 @@ module Hikaru.Form
   )
 where
   import Praha
+  import Praha.Logger
 
   import Hikaru.Types
   import Hikaru.Action
 
   import Data.Dynamic
   import Data.List (lookup, filter, map)
+  import UnliftIO
 
 
   -- Rendering Forms ---------------------------------------------------------
@@ -158,7 +160,7 @@ where
 
   data Env l
     = Env
-      { envControls    :: [Control l]
+      { envControls    :: IORef [Control l]
       , envFields      :: Maybe [(Text, Text)]
       , envFiles       :: Maybe [(Text, FilePath)]
       }
@@ -188,9 +190,22 @@ where
   --
   newtype FormT l m a
     = FormT
-      { unFormT        :: StateT (Env l) m a
+      { stack          :: ReaderT (Env l) m a
       }
-    deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
+    deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadFix
+             , MonadFail
+             , Contravariant
+             , MonadZip
+             , Alternative
+             , MonadPlus
+             , MonadIO
+             , MonadUnliftIO
+             , MonadTrans
+             , MonadLogger
+             )
 
   instance (MonadAction m) => MonadAction (FormT l m)
 
@@ -223,19 +238,26 @@ where
   -- |
   -- Run form supplying the request data manually.
   --
-  runFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a, Form l)
-  runFormT fdata FormT{..} = fixup <$> runStateT unFormT env0
-    where
-      fixup (res, env1) = ( if hasDanger env1.envControls
-                               then Nothing
-                               else res
-                          , Form env1.envControls
-                          )
+  runFormT :: (MonadIO m)
+           => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a, Form l)
+  runFormT fdata FormT{stack} = do
+    env   <- makeEnv fdata
+    res   <- runReaderT stack env
+    ctrls <- readIORef env.envControls
 
-      env0 = Env { envControls = []
-                 , envFields   = fmap fst fdata
-                 , envFiles    = fmap snd fdata
-                 }
+    return ( if hasDanger ctrls then Nothing else res
+           , Form ctrls
+           )
+
+
+  makeEnv :: (MonadIO m) => Maybe FormData -> m (Env l)
+  makeEnv fdata = do
+    envControls <- newIORef []
+
+    let envFields = fmap fst fdata
+        envFiles  = fmap snd fdata
+
+    return Env{..}
 
 
   hasDanger :: [Control l] -> Bool
@@ -245,11 +267,11 @@ where
       hasDanger' _ = False
 
 
-  evalFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a)
+  evalFormT :: (MonadIO m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a)
   evalFormT fdata = fmap fst . runFormT fdata
 
 
-  execFormT :: (Monad m) => Maybe FormData -> FormT l m (Maybe a) -> m (Form l)
+  execFormT :: (MonadIO m) => Maybe FormData -> FormT l m (Maybe a) -> m (Form l)
   execFormT fdata = fmap snd . runFormT fdata
 
 
@@ -263,7 +285,7 @@ where
   --
   -- Inputs use the first submitted value of matching name.
   --
-  input :: (Monad m, Param a)
+  input :: (MonadIO m, Param a)
         => Text                        -- ^ Name of the control
         -> l                           -- ^ Label describing the control
         -> Maybe a                     -- ^ Optional initial value
@@ -283,7 +305,7 @@ where
   --
   -- Selects use the first submitted value of matching name.
   --
-  select :: (Monad m, Param a)
+  select :: (MonadIO m, Param a)
          => Text                       -- ^ Name of the control
          -> l                          -- ^ Label describing the control
          -> Maybe a                    -- ^ Optional initial value
@@ -304,7 +326,7 @@ where
   -- Multiselects use all submitted values of matching name and
   -- interpret them as active choices.
   --
-  multiselect :: (Monad m, Param a)
+  multiselect :: (MonadIO m, Param a)
               => Text                  -- ^ Name of the control
               -> l                     -- ^ Label describing the control
               -> Maybe [a]             -- ^ Optional initial choices
@@ -324,7 +346,7 @@ where
   --
   -- Text areas use the first submitted value of matching name.
   --
-  textarea :: (Monad m, Param a)
+  textarea :: (MonadIO m, Param a)
            => Text                     -- ^ Name of the control
            -> l                        -- ^ Label describing the control
            -> Maybe a                  -- ^ Optional initial value
@@ -344,7 +366,7 @@ where
   --
   -- Buttons use the first submitted value of matching name.
   --
-  button :: (Monad m)
+  button :: (MonadIO m)
          => Text                       -- ^ Name of the button
          -> l                          -- ^ Label on the button
          -> [Trait l m Bool]           -- ^ List of traits to apply
@@ -363,7 +385,7 @@ where
   --
   -- Hidden fields use the first submitted value of matching name.
   --
-  hidden :: (Monad m, Param a)
+  hidden :: (MonadIO m, Param a)
          => Text                       -- ^ Name of the hidden field
          -> Maybe a                    -- ^ Optional initial value
          -> [Trait l m a]              -- ^ List of traits to apply
@@ -387,7 +409,7 @@ where
             }
 
 
-  addControl :: (Monad m)
+  addControl :: (MonadIO m)
              => Control l -> Maybe a -> Maybe a -> [Trait l m a]
              -> FormT l m (Maybe a)
   addControl ctrl0 value0 default_ traits = do
@@ -395,16 +417,17 @@ where
       foldr (>=>) return traits (value0 <|> default_, ctrl0)
 
     FormT do
-      modify \env -> env { envControls = env.envControls <> [ctrl1] }
+      Env{envControls} <- ask
+      modifyIORef envControls (<> [ctrl1])
       return value1
 
 
   getMaybeTextsValue :: (Monad m, Param a)
                     => Text -> FormT l m (Maybe [Text], Maybe a)
   getMaybeTextsValue name = do
-    maybeFields <- FormT $ gets (.envFields)
+    Env{envFields} <- FormT ask
 
-    case maybeFields of
+    case envFields of
       Nothing     -> return (Nothing, Nothing)
       Just fields -> do
         let tvalues = lookupMany name fields
@@ -414,9 +437,9 @@ where
   getMaybeTextsValues :: (Monad m, Param a)
                       => Text -> FormT l m (Maybe [Text], Maybe [a])
   getMaybeTextsValues name = do
-    maybeFields <- FormT $ gets (.envFields)
+    Env{envFields} <- FormT ask
 
-    case maybeFields of
+    case envFields of
       Nothing     -> return (Nothing, Nothing)
       Just fields -> do
         let tvalues = lookupMany name fields
