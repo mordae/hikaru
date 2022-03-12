@@ -27,6 +27,9 @@ module Hikaru.Dispatch
   , route
   , middleware
   , handler
+
+    -- * Middlewares
+  , makeChokingMiddleware
   )
 where
   import Praha hiding (curry)
@@ -39,6 +42,7 @@ where
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Status
   import Network.Wai
+  import UnliftIO
 
 
   -- |
@@ -179,6 +183,15 @@ where
       case lookup statusCode handlers of
         Just fn -> run (fn resp) req sink
         Nothing -> sink resp
+
+
+  -- Middlewares -------------------------------------------------------------
+
+
+  makeChokingMiddleware :: (MonadIO m) => Int -> m Middleware
+  makeChokingMiddleware limit = do
+    semaphore <- newQSem limit
+    return \app req sink -> withQSem semaphore (app req sink)
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
