@@ -1325,7 +1325,7 @@ where
   --
   -- Since 'Dynamic' is used under the wraps, reusing the same key with a
   -- different type of value is safe and will result in overwriting the
-  -- old key.
+  -- old key. Not very efficient to make use of it, though.
   --
   withCache :: (MonadAction m, Typeable a) => Text -> m a -> m a
   withCache key makeValue = do
