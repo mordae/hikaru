@@ -104,12 +104,11 @@ where
   -- |
   -- Register middleware.
   --
-  -- Middleware gets applied in the reverse order of its appearence,
-  -- but always after the error handler.
+  -- Middleware gets applied in the order of its appearence.
   --
   middleware :: Middleware -> Dispatch h ()
   middleware mw = Dispatch do
-    modify \e@Env{..} -> e { mwstack = mwstack . mw }
+    modify \e@Env{..} -> e { mwstack = mw . mwstack }
 
 
   -- |
