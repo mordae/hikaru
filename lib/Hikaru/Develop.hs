@@ -38,8 +38,8 @@ where
                  return stash
 
     tryTakeMVar stash >>= \case
-      Nothing          -> return ()
       Just (lock, tid) -> killThread tid >> takeMVar lock
+      Nothing          -> pass
 
     lock' <- newEmptyMVar
     tid'  <- forkFinally main $ const $ putMVar lock' ()

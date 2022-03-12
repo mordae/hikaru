@@ -256,7 +256,7 @@ where
       tag "div" "" do
         tag "div" "" do
           case ctrlLabel of
-            Nothing -> return ()
+            Nothing -> pass
             Just lb -> tag "label" "" do
               attr [ "for" .= ctrlName ]
               localizeHtml' lb
@@ -294,7 +294,7 @@ where
 
           case ctrlValues of
             Just (t:_) -> text t
-            _otherwise -> return ()
+            _otherwise -> pass
 
       _other -> do
         ph <- localizeText' ctrlPlaceholder

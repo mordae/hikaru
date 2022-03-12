@@ -95,7 +95,7 @@ where
   seedHandler :: (MonadAction m) => Route ts a -> m ()
   seedHandler r = do
     case routeVary r of
-      [] -> return ()
+      [] -> pass
       hs -> setHeader hVary (intercalate ", " hs)
 
     setHeader hCacheControl "no-cache"

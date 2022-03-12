@@ -286,7 +286,7 @@ where
   respond run req resp = do
     env <- makeActionEnv req
 
-    bracket_ (return ()) (finalize env) do
+    bracket_ pass (finalize env) do
       _   <- run env
 
       status  <- readIORef $ env.aeRespStatus
@@ -341,7 +341,7 @@ where
     aeRespStatus  <- newIORef status200
     aeRespHeaders <- newIORef []
     aeRespMaker   <- newIORef (\st hs -> responseLBS st hs "")
-    aeFinalize    <- newIORef (return ())
+    aeFinalize    <- newIORef pass
     aeBodyLimit   <- newIORef (10 * 1024 * 1024)
     aeBodyCounter <- newIORef 0
     aeLanguage    <- newIORef "en"
@@ -705,7 +705,7 @@ where
         ctype <- getContentType
 
         if matchMediaList ctype [ "application/json", "text/json" ]
-           then return ()
+           then pass
            else abort unsupportedMediaType415 [] "Send some JSON!"
 
         -- Taint and read.
@@ -1200,7 +1200,7 @@ where
       app pc = do
         void do
           conn <- WS.acceptRequest pc
-          WS.withPingThread conn 30 (return ()) do
+          WS.withPingThread conn 30 pass do
             runReaderT runWebSocket conn
 
 

@@ -157,8 +157,8 @@ where
                   <&> map (.mainType)
 
     case preferred of
-      Nothing   -> return ()
       Just lang -> setCookie cookieName lang
+      Nothing   -> pass
 
     setLanguage $ fromMaybe fallback $ preferred <|> previous <|> listToMaybe acceptable
 

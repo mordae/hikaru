@@ -16,7 +16,7 @@
 -- builder <- 'fromHtmlT' do
 --   'tag' \"a\" \"link-pretty px-2 py-1\" do
 --     'attr' [ \"href\" '.=' \"/help\" ]
---     'tag' \"i\" "bi bi-question-diamond" $ return ()
+--     'tag' \"i\" "bi bi-question-diamond" pass
 --     'text' \" Need help?\"
 -- @
 --
