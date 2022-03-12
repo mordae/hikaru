@@ -42,6 +42,7 @@ module Hikaru.Form
   , newForm
   , getForm
   , postForm
+  , formSubmitted
 
   -- ** Controls
   , input
@@ -71,6 +72,9 @@ module Hikaru.Form
   , addHint
   , adjust
   , adjustM
+
+  -- ** Alerts
+  , addAlert
   )
 where
   import Praha
@@ -93,6 +97,7 @@ where
   data Form l
     = Form
       { formControls   :: [Control l]
+      , formNotes      :: [Note l]
       }
 
 
@@ -161,6 +166,7 @@ where
   data Env l
     = Env
       { envControls    :: IORef [Control l]
+      , envNotes       :: IORef [Note l]
       , envFields      :: Maybe [(Text, Text)]
       , envFiles       :: Maybe [(Text, FilePath)]
       }
@@ -236,6 +242,15 @@ where
 
 
   -- |
+  -- Determine if the form was submitted (via 'getForm' or 'postForm').
+  --
+  formSubmitted :: (Monad m) => FormT l m Bool
+  formSubmitted = FormT do
+    Env{envFields} <- ask
+    return $ isJust envFields
+
+
+  -- |
   -- Run form supplying the request data manually.
   --
   runFormT :: (MonadIO m)
@@ -244,15 +259,17 @@ where
     env   <- makeEnv fdata
     res   <- runReaderT stack env
     ctrls <- readIORef env.envControls
+    notes <- readIORef env.envNotes
 
     return ( if hasDanger ctrls then Nothing else res
-           , Form ctrls
+           , Form ctrls notes
            )
 
 
   makeEnv :: (MonadIO m) => Maybe FormData -> m (Env l)
   makeEnv fdata = do
     envControls <- newIORef []
+    envNotes    <- newIORef []
 
     let envFields = fmap fst fdata
         envFiles  = fmap snd fdata
@@ -626,6 +643,20 @@ where
   adjustM fn (value0, ctrl) = do
     value1 <- traverse fn value0
     return (value1, ctrl)
+
+
+  -- Alerts ------------------------------------------------------------------
+
+
+  -- |
+  -- Add a form-wide alert with given severity and message.
+  --
+  -- Useful to signal after-submit global form validation result.
+  --
+  addAlert :: (MonadIO m) => Severity -> l -> FormT l m ()
+  addAlert sev msg = FormT do
+    Env{envNotes} <- ask
+    modifyIORef envNotes (<> [Note sev msg])
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
