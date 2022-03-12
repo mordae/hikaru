@@ -80,6 +80,7 @@ module Hikaru.Action
   , setResponseString
   , setResponseStream
   , setResponseRaw
+  , done
 
   -- ** WebSockets
   , setFrameLimit
@@ -108,7 +109,6 @@ module Hikaru.Action
 
   -- ** Action Environment
   , ActionEnv
-  , makeActionEnv
   , respond
 
   -- ** Re-Exports
@@ -275,6 +275,12 @@ where
       }
 
 
+  data Done = Done
+    deriving (Show, Eq)
+
+  instance Exception Done
+
+
   -- |
   -- Constructs 'ActionEnv' from the given 'Request', passes it to whatever
   -- action user deems interesting and finally constructs and send out the
@@ -287,7 +293,7 @@ where
     env <- makeActionEnv req
 
     bracket_ pass (finalize env) do
-      _   <- run env
+      catch (run env) \Done -> pass
 
       status  <- readIORef $ env.aeRespStatus
       headers <- readIORef $ env.aeRespHeaders
@@ -298,6 +304,14 @@ where
     where
       finalize :: ActionEnv -> IO ()
       finalize = join . readIORef . (.aeFinalize)
+
+
+  -- |
+  -- Immediately stop building the response and return whatever
+  -- status, headers and body has been set up so far.
+  --
+  done :: (MonadAction m) => m a
+  done = throwIO Done
 
 
   -- |
