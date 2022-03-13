@@ -31,6 +31,8 @@ module Hikaru.HTML
   , runHtmlT
   , fromHtmlT
   , fromHtml
+  , plainHtmlT
+  , plainHtml
 
     -- * Authoring
   , tag
@@ -197,6 +199,24 @@ where
   fromHtmlT body = do
     (_res, frags) <- runHtmlT body
     return $ mconcat $ fmap fromHtml frags
+
+
+  -- |
+  -- Extract just unescaped 'HtmlEscaped' data, effectively turning
+  -- the HTML fragment into plain text. Ignores 'HtmlRaw' fragments.
+  --
+  plainHtmlT :: (MonadIO m) => HtmlT m a -> m Builder
+  plainHtmlT body = do
+    (_res, frags) <- runHtmlT body
+    return $ mconcat $ fmap plainHtml frags
+
+
+  -- |
+  -- Extract just unescaped 'HtmlEscaped' data.
+  --
+  plainHtml :: Html -> Builder
+  plainHtml (HtmlEscaped esc) = fromText esc
+  plainHtml _other = mempty
 
 
   -- |

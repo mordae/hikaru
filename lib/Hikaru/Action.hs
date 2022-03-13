@@ -1010,7 +1010,7 @@ where
   sendHTML html = do
     defaultHeader hContentType "text/html; charset=utf8"
     builder <- fromHtmlT html
-    setResponseBS (toLazyByteString builder)
+    setResponseBuilder builder
 
 
   -- |

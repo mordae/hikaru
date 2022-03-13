@@ -59,8 +59,9 @@
 module Hikaru.Localize
   ( Locale
   , Localizable(..)
+  , localize'
+  , localizeText
   , localizeText'
-  , localizeHtml'
   , selectLanguage
   )
 where
@@ -69,6 +70,8 @@ where
   import Hikaru.Action
   import Hikaru.HTML
   import Hikaru.Media
+
+  import Blaze.ByteString.Builder (toByteString)
 
   import Data.List (filter, map, sortOn, reverse)
 
@@ -86,19 +89,11 @@ where
   --
   class (Show l) => Localizable l where
     -- |
-    -- Try to localize the message using given locale.
+    -- Localize the message using given locale.
     --
-    localizeText :: Locale -> l -> Text
-    localizeText _lang msg = tshow msg
-    {-# INLINE localizeText #-}
-
-    -- |
-    -- Same as 'localize', but for HTML.
-    -- Defaults to using the plain 'localize'.
-    --
-    localizeHtml :: (MonadIO m) => Locale -> l -> HtmlT m ()
-    localizeHtml lang msg = text (localizeText lang msg)
-    {-# INLINE localizeHtml #-}
+    localize :: (MonadIO m) => Locale -> l -> HtmlT m ()
+    localize _lang msg = text (tshow msg)
+    {-# INLINE localize #-}
 
 
   -- |
@@ -106,17 +101,27 @@ where
   -- gradual localization.
   --
   instance Localizable Text where
-    localizeText _lc msg = msg
-    {-# INLINE localizeText #-}
+    localize _lang msg = text msg
+    {-# INLINE localize #-}
 
 
   -- |
-  -- Instance to make 'Maybe' values simpler to render localized.
+  -- Simplify localization of optional messages.
   --
-  instance Localizable l => Localizable (Maybe l) where
-    localizeText lang (Just msg) = localizeText lang msg
-    localizeText _ Nothing       = ""
-    {-# INLINE localizeText #-}
+  instance (Localizable l) => Localizable (Maybe l) where
+    localize lang (Just msg) = localize lang msg
+    localize ____ Nothing    = pass
+
+
+  -- |
+  -- Localize given message to the language indicated by the
+  -- 'getLanguage' of the current action. Uses 'localize'.
+  --
+  localize' :: (MonadAction m, Localizable l) => l -> HtmlT m ()
+  localize' msg = do
+    lang <- getLanguage
+    localize lang msg
+  {-# INLINE localize' #-}
 
 
   -- |
@@ -126,17 +131,17 @@ where
   localizeText' :: (MonadAction m, Localizable l) => l -> m Text
   localizeText' msg = do
     lang <- getLanguage
-    return $ localizeText lang msg
+    localizeText lang msg
 
 
   -- |
-  -- Localize given message to the language indicated by the
-  -- 'getLanguage' of the current action. Uses 'localizeHtml'.
+  -- Localize the message using given locale and convert it
+  -- to 'Text' using 'plainHtmlT'.
   --
-  localizeHtml' :: (MonadAction m, Localizable l) => l -> HtmlT m ()
-  localizeHtml' msg = do
-    lang <- getLanguage
-    localizeHtml lang msg
+  localizeText :: (MonadIO m, Localizable l) => Text -> l -> m Text
+  localizeText lang msg = do
+    res <- plainHtmlT $ localize lang msg
+    return $ cs $ toByteString res
 
 
   -- |

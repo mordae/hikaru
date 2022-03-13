@@ -259,13 +259,13 @@ where
             Nothing -> pass
             Just lb -> tag "label" "" do
               attr [ "for" .= ctrlName ]
-              localizeHtml' lb
+              localize' lb
 
         formControl ctrl
 
         forM_ ctrlNote \Note{..} -> do
           tag "p" "" do
-            localizeHtml' noteMessage
+            localize' noteMessage
 
 
   formControl :: (Localizable l, MonadAction m) => Control l -> HtmlT m ()
@@ -318,7 +318,7 @@ where
       when (v `elem` selected) do
         attr [ "selected" .= "" ]
 
-      localizeHtml' l
+      localize' l
 
 
   data Case
@@ -372,21 +372,24 @@ where
     deriving (Show)
 
   instance Localizable Messages where
-    localizeText "en" MsgCaseName    = "Name"
-    localizeText "en" MsgCaseMode    = "Mode"
-    localizeText "en" MsgCaseEnabled = "Enabled"
-    localizeText "en" MsgCaseRecNo   = "Record #"
-    localizeText "en" MsgSubmit      = "Submit"
+    localize "en" msg = english msg
+    localize ____ msg = english msg
 
-    localizeText "en" MsgRequired    = "This field is required."
 
-    localizeText "en" (MsgAccessMode ModePublic)  = "Public"
-    localizeText "en" (MsgAccessMode ModePrivate) = "Private"
+  english :: (MonadIO m) => Messages -> HtmlT m ()
+  english MsgCaseName    = text "Name"
+  english MsgCaseMode    = text "Mode"
+  english MsgCaseEnabled = text "Enabled"
+  english MsgCaseRecNo   = text "Record #"
+  english MsgSubmit      = text "Submit"
 
-    localizeText "en" (MsgBool True)  = "True"
-    localizeText "en" (MsgBool False) = "False"
+  english MsgRequired    = text "This field is required."
 
-    localizeText _lng msg = localizeText "en" msg
+  english (MsgAccessMode ModePublic)  = text "Public"
+  english (MsgAccessMode ModePrivate) = text "Private"
+
+  english (MsgBool True)  = text "True"
+  english (MsgBool False) = text "False"
 
 
   addCaseForm :: (MonadAction m) => FormT Messages m (Maybe AddCase)
