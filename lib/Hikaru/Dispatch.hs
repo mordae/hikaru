@@ -137,6 +137,8 @@ where
   -- response with the status code and message repeated in the body.
   -- You can register your own 'handler', though.
   --
+  -- Adds 'abortMiddleware' automatically.
+  --
   dispatch :: (h -> Application) -> Dispatch h a -> Application
   dispatch run Dispatch{runDispatch} req = do
     let Env{..} = execState runDispatch initEnv
