@@ -415,7 +415,11 @@ where
 
     _submit <- button "submit" MsgSubmit []
 
-    return $ AddCase <$> acName <*> acRecNo <*> acMode <*> acActive
+    sameOrigin <- checkSameOrigin
+
+    if sameOrigin
+       then return $ AddCase <$> acName <*> acRecNo <*> acMode <*> acActive
+       else return $ Nothing
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

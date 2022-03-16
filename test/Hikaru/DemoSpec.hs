@@ -85,7 +85,20 @@ where
         runDemo do
           let payload = "name=Hooray&recno=42&mode=public&active=true"
           let mime = "application/x-www-form-urlencoded"
-          resp <- post "/case/" [(hContentType, mime)] payload
+          resp <- post "/case/" [ hContentType .= mime
+                                , "Host"       .= "localhost:1234"
+                                , "Origin"     .= "http://localhost:1234"
+                                ] payload
+          assertStatus 303 resp
+          assertHeader hLocation "/case/" resp
+
+      it "accepts valid input and redirects (without origin)" do
+        runDemo do
+          let payload = "name=Hooray&recno=42&mode=public&active=true"
+          let mime = "application/x-www-form-urlencoded"
+          resp <- post "/case/" [ hContentType .= mime
+                                , "Host"       .= "localhost:1234"
+                                ] payload
           assertStatus 303 resp
           assertHeader hLocation "/case/" resp
 
@@ -93,9 +106,29 @@ where
         runDemo do
           let payload = "active=lol"
           let mime = "application/x-www-form-urlencoded"
-          resp <- post "/case/?lang=XX" [(hContentType, mime)] payload
+          resp <- post "/case/?lang=XX" [ hContentType .= mime ] payload
           assertStatus 400 resp
           assertBodyContains "This field is required." resp
+
+      it "fails on different origin" do
+        runDemo do
+          let payload = "name=Hooray&recno=42&mode=public&active=true"
+          let mime = "application/x-www-form-urlencoded"
+          resp <- post "/case/" [ hContentType .= mime
+                                , "Host"       .= "localhost:1234"
+                                , "Origin"     .= "http://example.com"
+                                ] payload
+          assertStatus 400 resp
+
+      it "fails on different referer" do
+        runDemo do
+          let payload = "name=Hooray&recno=42&mode=public&active=true"
+          let mime = "application/x-www-form-urlencoded"
+          resp <- post "/case/" [ hContentType .= mime
+                                , "Host"       .= "localhost:1234"
+                                , "Referer"    .= "http://example.com"
+                                ] payload
+          assertStatus 400 resp
 
     describe "GET /case/" do
       it "now contains the added case" do

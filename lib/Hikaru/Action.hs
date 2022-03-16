@@ -38,6 +38,7 @@ module Hikaru.Action
   , getCookieMaybe
   , getCookieDefault
   , getReferrer
+  , checkSameOrigin
   , getBodyLength
   , setBodyLimit
   , getBodyLimit
@@ -138,6 +139,7 @@ where
   import Network.HTTP.Types.Header
   import Network.HTTP.Types.Method
   import Network.HTTP.Types.Status
+  import Network.URI
   import Network.Wai
   import Network.Wai.Handler.WebSockets
   import OpenSSL.EVP.Base64
@@ -567,7 +569,7 @@ where
 
 
   -- |
-  -- Obtain HTTP @Referrer@ header or just @/@.
+  -- Obtain HTTP @Referer@ header or just @/@.
   --
   -- Useful for redirects back to where the user came from.
   --
@@ -575,6 +577,34 @@ where
   getReferrer = do
     header <- getHeaderDefault hReferer "/"
     return (cs header)
+
+
+  -- |
+  -- Determine whether was the request made from the same origin or not.
+  --
+  -- Utilizes @Host@, @Origin@ and @Referer@ headers.
+  --
+  checkSameOrigin :: (MonadAction m) => m Bool
+  checkSameOrigin = do
+    host <- fmap cs <$> getHeaderMaybe "Host"
+    origin <- fmap join $ fmap parseHost <$> getHeaderMaybe "Origin"
+    referer <- fmap join $ fmap parseHost <$> getHeaderMaybe "Referer"
+
+    return
+      case (host, origin, referer) of
+        (   Nothing,            _,             _) -> True
+        (         _,      Nothing,       Nothing) -> True
+        (Just host', Just origin',             _) -> host' == origin'
+        (Just host',            _, Just referer') -> host' == referer'
+
+
+  parseHost :: ByteString -> Maybe String
+  parseHost uri = do
+    case parseURI (cs uri) of
+      Just URI{uriAuthority = Just URIAuth{uriRegName, uriPort}} ->
+        Just (uriRegName <> uriPort)
+
+      _otherwise -> Nothing
 
 
   -- |
