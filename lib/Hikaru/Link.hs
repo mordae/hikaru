@@ -13,6 +13,7 @@
 
 module Hikaru.Link
   ( buildLink
+  , outsideLink
   , updateQuery
   , rhref
   , qhref
@@ -86,8 +87,7 @@ where
   -- |
   -- Used to set href from a textual URL and a query string.
   --
-  -- Can be combined with 'updateQuery' like this:
-  --
+  -- Example:
   -- @
   -- 'tag' \"a\" \"\" do
   --   qhref \"\" [ \"lang\" .= \"en\" ]
@@ -95,7 +95,14 @@ where
   -- @
   --
   qhref :: (MonadIO m) => Text -> [(Text, Text)] -> HtmlT m ()
-  qhref url qs = attr [ "href" .= (url <> cs (toLazyByteString (toQuery qs))) ]
+  qhref url qs = attr [ "href" .= outsideLink url qs ]
+
+
+  -- |
+  -- Create link from given URL and some query string.
+  --
+  outsideLink :: Text -> [(Text, Text)] -> Text
+  outsideLink url qs = url <> cs (toLazyByteString (toQuery qs))
 
 
   -- |
