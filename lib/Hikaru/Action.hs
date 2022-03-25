@@ -541,6 +541,9 @@ where
     return $ fromParam =<< value
 
   {-# INLINE getParamMaybe #-}
+  {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
+  {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
 
   -- |
@@ -550,6 +553,9 @@ where
   getParamDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
   {-# INLINE getParamDefault #-}
+  {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
+  {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
 
   -- |
@@ -562,6 +568,9 @@ where
                    <$> getParams
 
   {-# INLINE getParamList #-}
+  {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Text] #-}
+  {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int64] #-}
+  {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int] #-}
 
 
   -- |
@@ -588,6 +597,9 @@ where
     return $ fromParam =<< value
 
   {-# INLINE getCookieMaybe #-}
+  {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
+  {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
 
   -- |
@@ -597,6 +609,9 @@ where
   getCookieDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
   {-# INLINE getCookieDefault #-}
+  {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
+  {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
 
   -- |
@@ -849,6 +864,9 @@ where
     return $ fromParam =<< value
 
   {-# INLINE getFieldMaybe #-}
+  {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
+  {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
 
   -- |
@@ -858,6 +876,9 @@ where
   getFieldDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
   {-# INLINE getFieldDefault #-}
+  {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
+  {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
 
   -- |
@@ -870,6 +891,7 @@ where
                    <$> getFields
 
   {-# INLINE getFieldList #-}
+  {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [Text] #-}
 
 
   -- |
@@ -1105,6 +1127,7 @@ where
     setResponseBuilder builder
 
   {-# INLINE sendHTML #-}
+  {-# SPECIALIZE sendHTML :: (MonadAction m) => HtmlT m () -> m () #-}
 
 
   -- |
@@ -1157,7 +1180,8 @@ where
 
 
   -- |
-  -- Redirect the user to where he came from using 'getReferrer'.
+  -- Redirect the user to where he came from, using 'getReferrer'.
+  -- It defaults to @/@ if no @Referer@ header is present.
   --
   redirectBack :: (MonadAction m) => m ()
   redirectBack = redirect =<< getReferrer
