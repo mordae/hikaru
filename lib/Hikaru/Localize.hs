@@ -133,6 +133,8 @@ where
     lang <- getLanguage
     localizeText lang msg
 
+  {-# INLINE localizeText' #-}
+
 
   -- |
   -- Localize the message using given locale and convert it
@@ -142,6 +144,8 @@ where
   localizeText lang msg = do
     res <- plainHtmlT $ localize lang msg
     return $ cs $ toByteString res
+
+  {-# INLINE localizeText #-}
 
 
   -- |
@@ -155,17 +159,20 @@ where
   selectLanguage paramName cookieName fallback = do
     preferred <- getParamMaybe paramName
     previous  <- getCookieMaybe cookieName
-    acceptable <- getAcceptLanguage
-                  <&> filter ((> 0) . (.quality))
-                  <&> sortOn (.quality)
-                  <&> reverse
-                  <&> map (.mainType)
+    acceptable <- bestLanguage <$> getAcceptLanguage
 
     case preferred of
       Just lang -> setCookie cookieName lang
       Nothing   -> pass
 
     setLanguage $ fromMaybe fallback $ preferred <|> previous <|> listToMaybe acceptable
+
+
+  bestLanguage :: [Media] -> [Text]
+  bestLanguage = map (.mainType)
+               . reverse
+               . sortOn (.quality)
+               . filter ((> 0) . (.quality))
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

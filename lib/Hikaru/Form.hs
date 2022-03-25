@@ -221,6 +221,7 @@ where
   --
   newForm :: (MonadAction m) => FormT l m (Maybe a) -> m (Form l)
   newForm form = execFormT Nothing form
+  {-# INLINE newForm #-}
 
 
   -- |
@@ -231,6 +232,8 @@ where
     params <- getParams
     runFormT (Just (params, [])) form
 
+  {-# INLINE getForm #-}
+
 
   -- |
   -- Render form using POST form data.
@@ -240,6 +243,8 @@ where
     formData <- getFormData
     runFormT (Just formData) form
 
+  {-# INLINE postForm #-}
+
 
   -- |
   -- Determine if the form was submitted (via 'getForm' or 'postForm').
@@ -248,6 +253,8 @@ where
   formSubmitted = FormT do
     Env{envFields} <- ask
     return $ isJust envFields
+
+  {-# INLINE formSubmitted #-}
 
 
   -- |
@@ -283,13 +290,17 @@ where
       hasDanger' Control{ctrlNote = Just (Note Danger _)} = True
       hasDanger' _ = False
 
+  {-# INLINE hasDanger #-}
+
 
   evalFormT :: (MonadIO m) => Maybe FormData -> FormT l m (Maybe a) -> m (Maybe a)
   evalFormT fdata = fmap fst . runFormT fdata
+  {-# INLINE evalFormT #-}
 
 
   execFormT :: (MonadIO m) => Maybe FormData -> FormT l m (Maybe a) -> m (Form l)
   execFormT fdata = fmap snd . runFormT fdata
+  {-# INLINE execFormT #-}
 
 
   -- Controls ----------------------------------------------------------------
@@ -575,6 +586,7 @@ where
   --
   choicesAuto :: (Monad m, Param a) => (a -> l) -> [a] -> Trait l m a
   choicesAuto label opts = choices [(label x, x) | x <- opts]
+  {-# INLINE choicesAuto #-}
 
 
   -- |
@@ -586,6 +598,7 @@ where
   choicesEnum :: (Monad m, Param a, Enum a, Bounded a)
               => (a -> l) -> Trait l m a
   choicesEnum label = choicesAuto label [minBound..maxBound]
+  {-# INLINE choicesEnum #-}
 
 
   -- |

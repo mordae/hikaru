@@ -195,5 +195,7 @@ where
     semaphore <- newQSem limit
     return \app req sink -> withQSem semaphore (app req sink)
 
+  {-# INLINE makeChokingMiddleware #-}
+
 
 -- vim:set ft=haskell sw=2 ts=2 et:

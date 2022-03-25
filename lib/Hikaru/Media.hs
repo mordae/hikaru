@@ -40,10 +40,10 @@ where
   --
   data Media
     = Media
-      { mainType       :: !Text
-      , subType        :: !Text
+      { mainType       :: Text
+      , subType        :: Text
       , params         :: [(Text, Text)]
-      , quality        :: !Float
+      , quality        :: Float
       }
     deriving (Show, Eq, Ord, Generic)
 
@@ -94,15 +94,14 @@ where
 
       pParameter :: Parser (Text, Text)
       pParameter = do
-        _     <- pSpaced $ char ';'
+        _     <- skipSpace *> char ';'
         name  <- pToken
-        _     <- pSpaced $ char '='
+        _     <- char '='
         value <- pValue
         return (name, value)
 
       pToken :: Parser Text
-      pToken = do
-        pSpaced $ takeTill isSpecial
+      pToken = pSpaced $ takeTill isSpecial
 
       pSeparator :: Parser Char
       pSeparator = pSpaced $ char ','
@@ -111,13 +110,16 @@ where
       pValue = pToken <|> pQuotedStr
 
       pQuotedStr :: Parser Text
-      pQuotedStr = pSpaced $ pQuoted $ takeTill (== '\\')
+      pQuotedStr = pSpaced $ pQuoted $ takeWhile isStrChar
 
       pSpaced :: Parser a -> Parser a
       pSpaced p = skipSpace *> p <* skipSpace
 
       pQuoted :: Parser a -> Parser a
       pQuoted p = char '"' *> p <* char '"'
+
+      isStrChar :: (Char -> Bool)
+      isStrChar c = c /= '\\' && c /= '"'
 
       isSpecial :: (Char -> Bool)
       isSpecial c = isControl c || isSpace c

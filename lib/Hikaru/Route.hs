@@ -143,8 +143,11 @@ where
     (Suitable x) <> (Suitable y) = Suitable (x * y)
     x <> y = min x y
 
+    {-# INLINE (<>) #-}
+
   instance Monoid Score where
     mempty = Suitable 1.0
+    {-# INLINE mempty #-}
 
 
   -- |
@@ -175,8 +178,11 @@ where
                   , vary  = nub (v1 <> v2)
                   }
 
+    {-# INLINE (<>) #-}
+
   instance Monoid Appraisal where
     mempty = Appraisal { score = \_ -> Suitable 1.0, vary = [] }
+    {-# INLINE mempty #-}
 
 
   type family RouteElim (r :: Type) (ts :: [Type]) where
@@ -207,6 +213,8 @@ where
       apply (this:rest) = func rest <*> fromParam this
       apply _otherwise  = Nothing
 
+  {-# INLINE (/:) #-}
+
 
   infixl 4 //
 
@@ -221,9 +229,10 @@ where
       apply (this:rest) = if this == seg then func rest else Nothing
       apply _otherwise  = Nothing
 
+  {-# INLINE (//) #-}
+
 
   infixl 4 /?
-
 
   -- |
   -- Extends the route with an appraisal. That is, an additional condition
@@ -236,6 +245,8 @@ where
       , score = a.score : r.score
       , path  = r.path
       }
+
+  {-# INLINE (/?) #-}
 
 
   -- |
@@ -250,6 +261,8 @@ where
                              _else -> Nothing
                  }
 
+  {-# INLINE root #-}
+
 
   -- |
   -- Check that the request used given HTTP verb.
@@ -261,12 +274,15 @@ where
                      then Suitable 1.0
                      else MethodNotAllowed
 
+  {-# INLINE method #-}
+
 
   -- |
   -- Combines 'root' with 'method' for the most common case.
   --
   get :: handler -> Route '[] handler
   get fn = root fn /? method "GET"
+  {-# INLINE get #-}
 
 
   -- |
@@ -274,6 +290,7 @@ where
   --
   post :: handler -> Route '[] handler
   post fn = root fn /? method "POST"
+  {-# INLINE post #-}
 
 
   -- |
@@ -288,12 +305,15 @@ where
                      then Suitable 1.0
                      else UpgradeRequired
 
+  {-# INLINE requireWebsocket #-}
+
 
   -- |
   -- Combines 'root' with 'requireWebsocket' for a common case.
   --
   websocket :: a -> Route '[] a
   websocket fn = root fn /? requireWebsocket
+  {-# INLINE websocket #-}
 
 
   -- |
@@ -302,6 +322,7 @@ where
   --
   routePath :: Route ts a -> [PathInfo]
   routePath Route{path} = reverse path
+  {-# INLINE routePath #-}
 
 
   -- |
@@ -309,6 +330,7 @@ where
   --
   routeApply :: [Text] -> Route ts a -> Maybe a
   routeApply xs Route{func} = func (reverse xs)
+  {-# INLINE routeApply #-}
 
 
   -- |
@@ -316,6 +338,7 @@ where
   --
   routeScore :: Request -> Route ts a -> Score
   routeScore req Route{score} = mconcat $ fmap ($ req) score
+  {-# INLINE routeScore #-}
 
 
   -- |
@@ -323,6 +346,7 @@ where
   --
   routeVary :: Route ts a -> [ByteString]
   routeVary Route{vary} = vary
+  {-# INLINE routeVary #-}
 
 
   -- |
@@ -332,6 +356,7 @@ where
   routeLink :: forall ts a. (HasRep ts, AllHave Param ts)
             => Route ts a -> HVectElim ts [Text]
   routeLink route = curry (routeLinkHVect route)
+  {-# INLINE routeLink #-}
 
 
   -- |
@@ -383,6 +408,8 @@ where
                              , "multipart/form-data"
                              ]
 
+  {-# INLINE acceptForm #-}
+
 
   -- |
   -- Shortcut to accept only JSON documents.
@@ -397,6 +424,7 @@ where
   acceptJSON = acceptContent [ "application/json"
                              , "text/json"
                              ]
+  {-# INLINE acceptJSON #-}
 
 
   -- |
@@ -404,6 +432,7 @@ where
   --
   varyOn :: HeaderName -> Appraisal
   varyOn h = Appraisal { vary = [original h], score = \_ -> Suitable 1.0 }
+  {-# INLINE varyOn #-}
 
 
   -- |
@@ -432,6 +461,7 @@ where
   --
   offerHTML :: Appraisal
   offerHTML = offerContent ["text/html"]
+  {-# INLINE offerHTML #-}
 
 
   -- |
@@ -443,6 +473,7 @@ where
   --
   offerText :: Appraisal
   offerText = offerContent ["text/plain"]
+  {-# INLINE offerText #-}
 
 
   -- |
@@ -454,6 +485,7 @@ where
   --
   offerJSON :: Appraisal
   offerJSON = offerContent ["application/json"]
+  {-# INLINE offerJSON #-}
 
 
   -- |

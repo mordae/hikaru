@@ -314,6 +314,7 @@ where
   --
   done :: (MonadAction m) => m a
   done = throwIO Done
+  {-# INLINE done #-}
 
 
   -- |
@@ -376,6 +377,7 @@ where
   --
   getRequest :: (MonadAction m) => m Request
   getRequest = (.aeRequest) <$> askActionEnv
+  {-# INLINE getRequest #-}
 
 
   -- |
@@ -383,6 +385,7 @@ where
   --
   getMethod :: (MonadAction m) => m Method
   getMethod = requestMethod <$> getRequest
+  {-# INLINE getMethod #-}
 
 
   -- |
@@ -390,6 +393,7 @@ where
   --
   getHeaders :: (MonadAction m) => m RequestHeaders
   getHeaders = requestHeaders <$> getRequest
+  {-# INLINE getHeaders #-}
 
 
   -- |
@@ -397,6 +401,7 @@ where
   --
   getHeaderMaybe :: (MonadAction m) => HeaderName -> m (Maybe ByteString)
   getHeaderMaybe n = lookup n <$> getHeaders
+  {-# INLINE getHeaderMaybe #-}
 
 
   -- |
@@ -405,6 +410,7 @@ where
   getHeaderDefault :: (MonadAction m)
                    => HeaderName -> ByteString -> m ByteString
   getHeaderDefault n v = fromMaybe v <$> getHeaderMaybe n
+  {-# INLINE getHeaderDefault #-}
 
 
   -- |
@@ -413,6 +419,7 @@ where
   --
   getBasicAuth :: (MonadAction m) => m (Maybe (Text, Text))
   getBasicAuth = (parseBasicAuth =<<) <$> getHeaderMaybe "Authorization"
+  {-# INLINE getBasicAuth #-}
 
 
   -- |
@@ -428,6 +435,8 @@ where
       Left _reason -> abort badRequest400 [] "Failed to parse Accept."
       Right media  -> return media
 
+  {-# INLINE getAccept #-}
+
 
   -- |
   -- Obtain the Accept-Charset header value or the default value of @\"*\"@.
@@ -441,6 +450,8 @@ where
     case parseMedia (cs value) of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Charset."
       Right media  -> return media
+
+  {-# INLINE getAcceptCharset #-}
 
 
   -- |
@@ -457,6 +468,8 @@ where
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Encoding."
       Right media  -> return media
 
+  {-# INLINE getAcceptEncoding #-}
+
 
   -- |
   -- Obtain the Accept-Language header value or the default value of @\"*\"@.
@@ -470,6 +483,8 @@ where
     case parseMedia (cs value) of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Language."
       Right media  -> return media
+
+  {-# INLINE getAcceptLanguage #-}
 
 
   -- |
@@ -487,12 +502,15 @@ where
       Right []     -> abort badRequest400 [] "Empty Content-Type."
       Right (m:_)  -> return m
 
+  {-# INLINE getContentType #-}
+
 
   -- |
   -- Obtain request path split on forward slashes.
   --
   getPathInfo :: (MonadAction m) => m [Text]
   getPathInfo = pathInfo <$> getRequest
+  {-# INLINE getPathInfo #-}
 
 
   -- |
@@ -500,6 +518,7 @@ where
   --
   getPathInfoRaw :: (MonadAction m) => m Text
   getPathInfoRaw = cs <$> rawPathInfo <$> getRequest
+  {-# INLINE getPathInfoRaw #-}
 
 
   -- |
@@ -508,6 +527,8 @@ where
   getParams :: (MonadAction m) => m [(Text, Text)]
   getParams = map convert <$> queryString <$> getRequest
     where convert (n, v) = (cs n, maybe "" cs v)
+
+  {-# INLINE getParams #-}
 
 
   -- |
@@ -519,6 +540,8 @@ where
     value <- lookup n <$> getParams
     return $ fromParam =<< value
 
+  {-# INLINE getParamMaybe #-}
+
 
   -- |
   -- Similar to 'getParamMaybe', but return either the parsed parameter
@@ -526,6 +549,7 @@ where
   --
   getParamDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
+  {-# INLINE getParamDefault #-}
 
 
   -- |
@@ -536,6 +560,8 @@ where
   getParamList n = mapMaybe (fromParam . snd)
                    <$> filter ((n ==) . fst)
                    <$> getParams
+
+  {-# INLINE getParamList #-}
 
 
   -- |
@@ -549,6 +575,8 @@ where
       Nothing -> return []
       Just bs -> return $ map cs2 $ parseCookies bs
 
+  {-# INLINE getCookies #-}
+
 
   -- |
   -- Obtain a specific cookie and parse it on the fly to the target type.
@@ -559,6 +587,8 @@ where
     value <- lookup n <$> getCookies
     return $ fromParam =<< value
 
+  {-# INLINE getCookieMaybe #-}
+
 
   -- |
   -- Similar to 'getCookieMaybe', but return either the parsed cookie
@@ -566,6 +596,7 @@ where
   --
   getCookieDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
+  {-# INLINE getCookieDefault #-}
 
 
   -- |
@@ -577,6 +608,8 @@ where
   getReferrer = do
     header <- getHeaderDefault hReferer "/"
     return (cs header)
+
+  {-# INLINE getReferrer #-}
 
 
   -- |
@@ -596,6 +629,8 @@ where
         (         _,      Nothing,       Nothing) -> True
         (Just host', Just origin',             _) -> host' == origin'
         (Just host',            _, Just referer') -> host' == referer'
+
+  {-# INLINE checkSameOrigin #-}
 
 
   parseHost :: ByteString -> Maybe String
@@ -619,6 +654,8 @@ where
       ChunkedBody   -> return $ Nothing
       KnownLength n -> return $ Just (fromIntegral n)
 
+  {-# INLINE getBodyLength #-}
+
 
   -- |
   -- Set limit (in bytes) for reading the request body in order to
@@ -637,6 +674,7 @@ where
   --
   setBodyLimit :: (MonadAction m) => Int64 -> m ()
   setBodyLimit = setActionField (.aeBodyLimit)
+  {-# INLINE setBodyLimit #-}
 
 
   -- |
@@ -644,6 +682,7 @@ where
   --
   getBodyLimit :: (MonadAction m) => m Int64
   getBodyLimit = getActionField (.aeBodyLimit)
+  {-# INLINE getBodyLimit #-}
 
 
   -- |
@@ -658,6 +697,8 @@ where
   getBodyChunk = do
     getChunk <- getBodyChunkIO
     liftIO getChunk
+
+  {-# INLINE getBodyChunk #-}
 
 
   -- |
@@ -795,6 +836,7 @@ where
   --
   getFields :: (MonadAction m) => m [(Text, Text)]
   getFields = map cs2 <$> fst <$> getFormData
+  {-# INLINE getFields #-}
 
 
   -- |
@@ -806,6 +848,8 @@ where
     value <- lookup n <$> getFields
     return $ fromParam =<< value
 
+  {-# INLINE getFieldMaybe #-}
+
 
   -- |
   -- Similar to 'getFieldMaybe', but return either the parsed field
@@ -813,6 +857,7 @@ where
   --
   getFieldDefault :: (MonadAction m, Param a) => Text -> a -> m a
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
+  {-# INLINE getFieldDefault #-}
 
 
   -- |
@@ -824,6 +869,8 @@ where
                    <$> filter ((n ==) . fst)
                    <$> getFields
 
+  {-# INLINE getFieldList #-}
+
 
   -- |
   -- Identical to 'getFields', except it returns information about
@@ -831,6 +878,7 @@ where
   --
   getFiles :: (MonadAction m) => m [(Text, FilePath)]
   getFiles = snd <$> getFormData
+  {-# INLINE getFiles #-}
 
 
   -- |
@@ -838,6 +886,7 @@ where
   --
   getFileMaybe :: (MonadAction m) => Text -> m (Maybe FilePath)
   getFileMaybe n = lookup n <$> getFiles
+  {-# INLINE getFileMaybe #-}
 
 
   -- |
@@ -845,6 +894,7 @@ where
   --
   getFileList :: (MonadAction m) => Text -> m [FilePath]
   getFileList n = map snd . filter ((n ==) . fst) <$> getFiles
+  {-# INLINE getFileList #-}
 
 
   -- |
@@ -953,6 +1003,7 @@ where
   --
   setStatus :: (MonadAction m) => Status -> m ()
   setStatus = setActionField (.aeRespStatus)
+  {-# INLINE setStatus #-}
 
 
   -- |
@@ -960,6 +1011,7 @@ where
   --
   setHeaders :: (MonadAction m) => ResponseHeaders -> m ()
   setHeaders = setActionField (.aeRespHeaders)
+  {-# INLINE setHeaders #-}
 
 
   -- |
@@ -967,6 +1019,7 @@ where
   --
   addHeader :: (MonadAction m) => HeaderName -> ByteString -> m ()
   addHeader n v = modifyActionField (.aeRespHeaders) ((n, v) :)
+  {-# INLINE addHeader #-}
 
 
   -- |
@@ -978,6 +1031,8 @@ where
     where
       update hs = (n, v) : deleteBy headerEq (n, v) hs
 
+  {-# INLINE setHeader #-}
+
 
   -- |
   -- Set header only if it has not been set yet.
@@ -986,6 +1041,7 @@ where
   --
   defaultHeader :: (MonadAction m) => HeaderName -> ByteString -> m ()
   defaultHeader n v = modifyHeader n (fromMaybe v)
+  {-# INLINE defaultHeader #-}
 
 
   -- |
@@ -1007,6 +1063,8 @@ where
       update hs = (n, v') : deleteBy headerEq (n, v') hs
         where v' = fn (lookup n hs)
 
+  {-# INLINE modifyHeader #-}
+
 
   -- |
   -- Set a cookie with name, value and @SameSite=Lax@.
@@ -1023,6 +1081,8 @@ where
                                    , setCookieSameSite = Just sameSiteLax
                                    }
 
+  {-# INLINE setCookie #-}
+
 
   -- |
   -- Set a cookie using the 'Web.Cookie.SetCookie' directly.
@@ -1030,6 +1090,8 @@ where
   setCookieEx :: (MonadAction m) => SetCookie -> m ()
   setCookieEx cookie = do
     addHeader hSetCookie $ cs $ toLazyByteString $ renderSetCookie cookie
+
+  {-# INLINE setCookieEx #-}
 
 
   -- |
@@ -1042,6 +1104,8 @@ where
     builder <- fromHtmlT html
     setResponseBuilder builder
 
+  {-# INLINE sendHTML #-}
+
 
   -- |
   -- Default @Content-Type@ to @text/plain; charset=utf8@
@@ -1051,6 +1115,8 @@ where
   sendText text = do
     defaultHeader hContentType "text/plain; charset=utf8"
     setResponseText' text
+
+  {-# INLINE sendText #-}
 
 
   -- |
@@ -1062,6 +1128,8 @@ where
     defaultHeader hContentType "text/plain; charset=utf8"
     setResponseString str
 
+  {-# INLINE sendString #-}
+
 
   -- |
   -- Default @Content-Type@ to @application/json@ and set the response
@@ -1071,6 +1139,8 @@ where
   sendJSON payload = do
     defaultHeader hContentType "application/json"
     setResponseBS (encode payload)
+
+  {-# INLINE sendJSON #-}
 
 
   -- |
@@ -1083,12 +1153,15 @@ where
     setStatus status303
     setHeader hLocation (cs location)
 
+  {-# INLINE redirect #-}
+
 
   -- |
   -- Redirect the user to where he came from using 'getReferrer'.
   --
   redirectBack :: (MonadAction m) => m ()
   redirectBack = redirect =<< getReferrer
+  {-# INLINE redirectBack #-}
 
 
   -- |
@@ -1100,6 +1173,8 @@ where
   setResponseFile fp mfp = do
     setActionField (.aeRespMaker) \st hs -> responseFile st hs fp mfp
 
+  {-# INLINE setResponseFile #-}
+
 
   -- |
   -- Create response body using a 'Builder'.
@@ -1107,6 +1182,8 @@ where
   setResponseBuilder :: (MonadAction m) => Builder -> m ()
   setResponseBuilder bld = do
     setActionField (.aeRespMaker) \st hs -> responseBuilder st hs bld
+
+  {-# INLINE setResponseBuilder #-}
 
 
   -- |
@@ -1116,12 +1193,16 @@ where
   setResponseBS bs = do
     setActionField (.aeRespMaker) \st hs -> responseLBS st hs bs
 
+  {-# INLINE setResponseBS #-}
+
 
   -- |
   -- Create response body using a strict 'ByteString'.
   --
   setResponseBS' :: (MonadAction m) => ByteString -> m ()
   setResponseBS' = setResponseBS . cs
+
+  {-# INLINE setResponseBS' #-}
 
 
   -- |
@@ -1130,6 +1211,8 @@ where
   setResponseText :: (MonadAction m) => LT.Text -> m ()
   setResponseText = setResponseBS . cs
 
+  {-# INLINE setResponseText #-}
+
 
   -- |
   -- Create response body using a strict 'Text'.
@@ -1137,12 +1220,15 @@ where
   setResponseText' :: (MonadAction m) => Text -> m ()
   setResponseText' = setResponseBS . cs
 
+  {-# INLINE setResponseText' #-}
+
 
   -- |
   -- Create response body using a 'String'.
   --
   setResponseString :: (MonadAction m) => String -> m ()
   setResponseString = setResponseBS . cs
+  {-# INLINE setResponseString #-}
 
 
   -- |
@@ -1151,6 +1237,8 @@ where
   setResponseStream :: (MonadAction m) => StreamingBody -> m ()
   setResponseStream strm = do
     setActionField (.aeRespMaker) \st hs -> responseStream st hs strm
+
+  {-# INLINE setResponseStream #-}
 
 
   -- |
@@ -1174,6 +1262,8 @@ where
   setResponseRaw comm resp = do
     setActionField (.aeRespMaker) \_st _hs -> responseRaw comm resp
 
+  {-# INLINE setResponseRaw #-}
+
 
   -- WebSockets --------------------------------------------------------------
 
@@ -1189,6 +1279,7 @@ where
   --
   setFrameLimit :: (MonadAction m) => Int64 -> m ()
   setFrameLimit = setActionField (.aeFrameLimit)
+  {-# INLINE setFrameLimit #-}
 
 
   -- |
@@ -1204,6 +1295,7 @@ where
   --
   setMessageLimit :: (MonadAction m) => Int64 -> m ()
   setMessageLimit = setActionField (.aeMsgLimit)
+  {-# INLINE setMessageLimit #-}
 
 
   -- |
@@ -1266,6 +1358,8 @@ where
     conn <- wsGetConn
     liftIO $ WS.sendTextData conn payload
 
+  {-# INLINE wsSendText #-}
+
 
   -- |
   -- Send a binary message.
@@ -1274,6 +1368,8 @@ where
   wsSendBinary payload = do
     conn <- wsGetConn
     liftIO $ WS.sendBinaryData conn payload
+
+  {-# INLINE wsSendBinary #-}
 
 
   -- |
@@ -1285,12 +1381,15 @@ where
     conn <- wsGetConn
     liftIO $ WS.receiveData conn
 
+  {-# INLINE wsReceive #-}
+
 
   -- |
   -- Get the WebSocket connection.
   --
   wsGetConn :: WebSocket WS.Connection
   wsGetConn = WebSocket ask
+  {-# INLINE wsGetConn #-}
 
 
   -- Errors ------------------------------------------------------------------
@@ -1307,6 +1406,8 @@ where
   abort st hdrs msg = throwIO $ AbortAction st hdrs' msg
     where hdrs' = (hContentType, "text/plain; charset=utf8") : hdrs
 
+  {-# INLINE abort #-}
+
 
   -- |
   -- Catches 'AbortAction' and turns it into a 'Response'.
@@ -1315,6 +1416,8 @@ where
   abortMiddleware app req sink = do
     app req sink `catch` \AbortAction{..} -> do
       sink $ responseLBS status headers (cs message)
+
+  {-# INLINE abortMiddleware #-}
 
 
   -- Localization ------------------------------------------------------------
@@ -1328,6 +1431,7 @@ where
   --
   getLanguage :: (MonadAction m) => m Text
   getLanguage = getActionField (.aeLanguage)
+  {-# INLINE getLanguage #-}
 
 
   -- |
@@ -1337,6 +1441,7 @@ where
   --
   setLanguage :: (MonadAction m) => Text -> m ()
   setLanguage = setActionField (.aeLanguage)
+  {-# INLINE setLanguage #-}
 
 
   -- Cacheing ----------------------------------------------------------------
@@ -1370,21 +1475,23 @@ where
       Just value -> do
         return value
 
+  {-# INLINE withCache #-}
+
 
   -- |
   -- Drop a single cached value.
   --
   dropCache :: (MonadAction m) => Text -> m ()
-  dropCache key = do
-    modifyActionField (.aeCache) (Map.delete key)
+  dropCache key = modifyActionField (.aeCache) (Map.delete key)
+  {-# INLINE dropCache #-}
 
 
   -- |
   -- Drop all cached values.
   --
   dropCaches :: (MonadAction m) => m ()
-  dropCaches = do
-    modifyActionField (.aeCache) (const Map.empty)
+  dropCaches = modifyActionField (.aeCache) (const Map.empty)
+  {-# INLINE dropCaches #-}
 
 
   -- Finalizing --------------------------------------------------------------
@@ -1395,8 +1502,8 @@ where
   -- or fails with an error.
   --
   registerFinalizer :: (MonadAction m) => IO a -> m ()
-  registerFinalizer fin = do
-    modifyActionField (.aeFinalize) (fin >>)
+  registerFinalizer fin = modifyActionField (.aeFinalize) (fin >>)
+  {-# INLINE registerFinalizer #-}
 
 
   -- Misc Utilities ----------------------------------------------------------
