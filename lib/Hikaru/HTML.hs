@@ -25,14 +25,11 @@ module Hikaru.HTML
   (
     -- * Types
     HtmlT
-  , Html(..)
 
     -- * Rendering
   , runHtmlT
   , fromHtmlT
-  , fromHtml
   , plainHtmlT
-  , plainHtml
 
     -- * Authoring
   , tag
@@ -43,31 +40,15 @@ module Hikaru.HTML
   , doctype
   )
 where
-  import Praha
+  import Praha hiding (toList)
   import Praha.Logger
 
   import Blaze.ByteString.Builder
   import Blaze.ByteString.Builder.Html.Utf8
+  import Data.Map.Merge.Strict
   import UnliftIO.IORef
 
-  import Data.List (reverse, filter, sortOn)
-
-
-  -- |
-  -- Fragment of HTML code.
-  --
-  data Html
-    = HtmlTag Text [Html]
-      -- ^ Tag with a name and a body.
-    | HtmlEmptyTag Text [Html]
-      -- ^ Unclosed tag with just attributes.
-    | HtmlRaw Text
-      -- ^ Raw chunk of HTML to be rendered directly.
-    | HtmlEscaped Text
-      -- ^ Chunk of text to be escaped upon rendering.
-    | HtmlAttribute Text Text
-      -- ^ Attribute on the parent tag.
-    deriving (Show, Eq)
+  import GHC.Exts (Item, toList)
 
 
   -- |
@@ -77,7 +58,7 @@ where
   --
   newtype HtmlT m a
     = HtmlT
-      { stack          :: ReaderT (IORef [Html]) m a
+      { stack          :: ReaderT Env m a
       }
     deriving ( Functor
              , Applicative
@@ -94,42 +75,91 @@ where
              )
 
 
-  emitHtml :: (MonadIO m) => Html -> ReaderT (IORef [Html]) m ()
-  emitHtml body = do
-    ioref <- ask
-    modifyIORef' ioref (body :)
+  data Env
+    = Env
+      { envAttrs       :: IORef Attributes
+      , envInner       :: IORef Builder
+      , envRich        :: Bool
+      }
 
-  {-# INLINE emitHtml #-}
+
+  data Attributes
+    = Attributes
+      { attributes     :: Map Text Text
+      }
+
+  instance IsList Attributes where
+    type Item Attributes = (Text, Text)
+    fromList list = Attributes (fromList list)
+    toList Attributes{attributes} = toList attributes
+
+  instance Semigroup Attributes where
+    Attributes a <> Attributes b =
+      let cat _key new old = old <> " " <> new
+       in Attributes (merge preserveMissing preserveMissing (zipWithMatched cat) a b)
+
+  instance Monoid Attributes where
+    mempty = Attributes mempty
 
 
   -- |
   -- Build the 'Html' tree.
   --
-  runHtmlT :: (MonadIO m) => HtmlT m a -> m (a, [Html])
+  runHtmlT :: (MonadIO m) => HtmlT m a -> m (a, Builder)
   runHtmlT HtmlT{stack} = do
-    ioref <- newIORef []
-    res <- runReaderT stack ioref
-    children <- readIORef ioref
-    return (res, reverse children)
+    envAttrs <- newIORef mempty
+    envInner <- newIORef mempty
+
+    res <- runReaderT stack Env{envRich = True, ..}
+
+    builder <- readIORef envInner
+    return (res, builder)
+
+
+  -- |
+  -- Extract just unescaped 'text' chunks, effectively turning the
+  -- HTML fragment into plain text.
+  --
+  plainHtmlT :: (MonadIO m) => HtmlT m a -> m Builder
+  plainHtmlT HtmlT{stack} = do
+    envAttrs <- newIORef mempty
+    envInner <- newIORef mempty
+
+    void do
+      runReaderT stack Env{envRich = False, ..}
+
+    builder <- readIORef envInner
+    return builder
+
+
+  -- |
+  -- Convert 'HtmlT' to a 'Builder'.
+  --
+  fromHtmlT :: (Monad m, MonadIO m) => HtmlT m a -> m Builder
+  fromHtmlT = fmap snd . runHtmlT
 
 
   -- |
   -- Add a tag with opening and closing mark, possibly holding children.
   --
-  tag :: (MonadIO m)
+  tag :: (Monad m, MonadIO m)
       => Text                -- ^ Tag name
       -> Text                -- ^ Classes
       -> HtmlT m a           -- ^ Children
       -> HtmlT m a
   tag name classes HtmlT{stack} = HtmlT do
-    ioref <- newIORef []
-    res <- local (const ioref) stack
+    Env{envRich} <- ask
+    envAttrs <- newIORef mempty
+    envInner <- newIORef mempty
 
-    children <- readIORef ioref
+    unless (classes == "") do
+      modifyIORef' envAttrs (<> fromList ["class" .= classes])
 
-    if classes /= ""
-       then emitHtml $ HtmlTag name (HtmlAttribute "class" classes : reverse children)
-       else emitHtml $ HtmlTag name (reverse children)
+    res <- lift (runReaderT stack Env{..})
+
+    attrs <- readIORef envAttrs
+    inner <- readIORef envInner
+    emitTag name attrs inner
 
     return res
 
@@ -145,11 +175,9 @@ where
        -> [(Text, Text)]     -- ^ Attributes
        -> HtmlT m ()
   tag' name classes attrs = HtmlT do
-    let children = fmap (uncurry HtmlAttribute) attrs
-
     if classes /= ""
-       then emitHtml $ HtmlEmptyTag name (HtmlAttribute "class" classes : children)
-       else emitHtml $ HtmlEmptyTag name children
+       then emitUnclosed name (fromList $ ("class", classes) : attrs)
+       else emitUnclosed name (fromList attrs)
 
   {-# INLINE tag' #-}
 
@@ -162,8 +190,8 @@ where
   --
   attr :: (MonadIO m) => [(Text, Text)] -> HtmlT m ()
   attr attrs = HtmlT do
-    forM_ attrs \(name, val) -> do
-      emitHtml $ HtmlAttribute name val
+    Env{envAttrs} <- ask
+    modifyIORef' envAttrs (<> fromList attrs)
 
   {-# INLINE attr #-}
 
@@ -172,7 +200,7 @@ where
   -- Add an escaped text.
   --
   text :: (MonadIO m) => Text -> HtmlT m ()
-  text body = HtmlT $ emitHtml $ HtmlEscaped body
+  text = HtmlT . emitEscaped
   {-# INLINE text #-}
 
 
@@ -180,7 +208,7 @@ where
   -- Add a raw chunk of HTML code.
   --
   html :: (MonadIO m) => Text -> HtmlT m ()
-  html body = HtmlT $ emitHtml $ HtmlRaw body
+  html = HtmlT . emitRaw
   {-# INLINE html #-}
 
 
@@ -188,99 +216,60 @@ where
   -- Add the HTML5 doctype of @<!doctype html>@ followed by a newline.
   --
   doctype :: (MonadIO m) => HtmlT m ()
-  doctype = html "<!doctype html>\n"
+  doctype = HtmlT (emitHtml "<!doctype html>\n")
   {-# INLINE doctype #-}
 
 
-  -- |
-  -- Convert 'HtmlT' to a 'Builder'.
-  --
-  fromHtmlT :: (MonadIO m) => HtmlT m a -> m Builder
-  fromHtmlT body = do
-    (_res, frags) <- runHtmlT body
-    return $ mconcat $ fmap fromHtml frags
+  emitEscaped :: (MonadIO m) => Text -> ReaderT Env m ()
+  emitEscaped t = do
+    Env{envRich, envInner} <- ask
+
+    if envRich
+       then modifyIORef' envInner (<> fromHtmlEscapedText t)
+       else modifyIORef' envInner (<> fromText t)
 
 
-  -- |
-  -- Extract just unescaped 'HtmlEscaped' data, effectively turning
-  -- the HTML fragment into plain text. Ignores 'HtmlRaw' fragments.
-  --
-  plainHtmlT :: (MonadIO m) => HtmlT m a -> m Builder
-  plainHtmlT body = do
-    (_res, frags) <- runHtmlT body
-    return $ mconcat $ fmap plainHtml frags
+  emitHtml :: (MonadIO m) => Builder -> ReaderT Env m ()
+  emitHtml builder = do
+    Env{envRich, envInner} <- ask
+
+    when envRich do
+      modifyIORef' envInner (<> builder)
 
 
-  -- |
-  -- Extract just unescaped 'HtmlEscaped' data.
-  --
-  plainHtml :: Html -> Builder
-  plainHtml (HtmlEscaped esc) = fromText esc
-  plainHtml _other = mempty
+  emitRaw :: (MonadIO m) => Text -> ReaderT Env m ()
+  emitRaw = emitHtml . fromText
 
 
-  -- |
-  -- Convert 'Html' tree to a 'Builder'.
-  --
-  fromHtml :: Html -> Builder
-  fromHtml (HtmlRaw raw) =
-    fromText raw
-
-  fromHtml (HtmlEscaped esc) =
-    fromHtmlEscapedText esc
-
-  fromHtml (HtmlAttribute name "") =
-    mconcat [ fromText " "
-            , fromText name
-            ]
-
-  fromHtml (HtmlAttribute name val) =
-    mconcat [ fromText " "
-            , fromText name
-            , fromText "=\""
-            , fromHtmlEscapedText val
-            , fromText "\""
-            ]
-
-  fromHtml (HtmlTag name children) =
-    mconcat [ fromText "<"
-            , fromText name
-            , mconcat $ fmap fromHtml $ mergeAttr $ sortOn htmlSort $ filter isAttr children
-            , fromText ">"
-            , mconcat $ fmap fromHtml $ filter (not . isAttr) children
-            , fromText "</"
-            , fromText name
-            , fromText ">"
-            ]
-
-  fromHtml (HtmlEmptyTag name children) =
-    mconcat [ fromText "<"
-            , fromText name
-            , mconcat $ fmap fromHtml $ mergeAttr $ sortOn htmlSort $ filter isAttr children
-            , fromText ">"
-            ]
+  emitTag :: (MonadIO m) => Text -> Attributes -> Builder -> ReaderT Env m ()
+  emitTag name attrs inner = do
+    emitHtml $ mconcat [ "<"
+                       , fromText name
+                       , foldMap buildAttr (toList attrs)
+                       , ">"
+                       , inner
+                       , "</"
+                       , fromText name
+                       , ">"
+                       ]
 
 
-  isAttr :: Html -> Bool
-  isAttr (HtmlAttribute _ _) = True
-  isAttr _ = False
+  emitUnclosed :: (MonadIO m) => Text -> Attributes -> ReaderT Env m ()
+  emitUnclosed name attrs = do
+    emitHtml $ mconcat [ "<"
+                       , fromText name
+                       , foldMap buildAttr (toList attrs)
+                       , ">"
+                       ]
 
 
-  htmlSort :: Html -> Maybe Text
-  htmlSort (HtmlAttribute name _) = Just name
-  htmlSort _otherwise             = Nothing
-
-
-  mergeAttr :: [Html] -> [Html]
-  mergeAttr = foldr merge []
-    where
-      merge head@(HtmlAttribute name0 val0)
-            tail@(HtmlAttribute name1 val1 : rest) =
-        if name0 == name1
-           then HtmlAttribute name0 (val0 <> " " <> val1) : rest
-           else head : tail
-
-      merge head tail = head : tail
+  buildAttr :: (Text, Text) -> Builder
+  buildAttr (key, value) = mconcat [ " "
+                                   , fromText key
+                                   , "=\""
+                                   , fromHtmlEscapedText value
+                                   , "\""
+                                   ]
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:
