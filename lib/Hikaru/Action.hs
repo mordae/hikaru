@@ -540,6 +540,7 @@ where
 
   {-# INLINE getParamMaybe #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
@@ -552,6 +553,7 @@ where
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
   {-# INLINE getParamDefault #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
@@ -567,6 +569,7 @@ where
 
   {-# INLINE getParamList #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Text] #-}
+  {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int32] #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int64] #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int] #-}
 
@@ -596,6 +599,7 @@ where
 
   {-# INLINE getCookieMaybe #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
@@ -608,6 +612,7 @@ where
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
   {-# INLINE getCookieDefault #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
@@ -863,6 +868,7 @@ where
 
   {-# INLINE getFieldMaybe #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
 
@@ -875,6 +881,7 @@ where
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
   {-# INLINE getFieldDefault #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int -> m Int #-}
 
@@ -1125,7 +1132,6 @@ where
     setResponseBuilder builder
 
   {-# INLINE sendHTML #-}
-  {-# SPECIALIZE sendHTML :: (MonadAction m) => HtmlT m () -> m () #-}
 
 
   -- |
