@@ -78,7 +78,6 @@ module Hikaru.Form
   )
 where
   import Praha
-  import Praha.Logger
 
   import Hikaru.Types
   import Hikaru.Action
@@ -210,7 +209,6 @@ where
              , MonadIO
              , MonadUnliftIO
              , MonadTrans
-             , MonadLogger
              )
 
   instance (MonadAction m) => MonadAction (FormT l m)

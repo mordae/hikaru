@@ -117,7 +117,6 @@ module Hikaru.Action
   )
 where
   import Praha
-  import Praha.Logger
 
   import Hikaru.HTML (fromHtmlT, HtmlT)
   import Hikaru.Media
@@ -198,7 +197,6 @@ where
              , MonadIO
              , MonadUnliftIO
              , MonadTrans
-             , MonadLogger
              )
 
   instance (MonadIO m) => MonadAction (ActionT m) where

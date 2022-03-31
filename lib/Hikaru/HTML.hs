@@ -41,7 +41,6 @@ module Hikaru.HTML
   )
 where
   import Praha hiding (toList)
-  import Praha.Logger
 
   import Blaze.ByteString.Builder
   import Blaze.ByteString.Builder.Html.Utf8
@@ -68,7 +67,6 @@ where
              , MonadFail
              , MonadFix
              , MonadIO
-             , MonadLogger
              , MonadPlus
              , MonadTrans
              , MonadUnliftIO
