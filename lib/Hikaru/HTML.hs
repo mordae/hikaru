@@ -42,12 +42,17 @@ module Hikaru.HTML
 where
   import Praha hiding (toList)
 
-  import Blaze.ByteString.Builder
-  import Blaze.ByteString.Builder.Html.Utf8
+  import Data.ByteString.Builder
+  import Data.Map (insert)
   import Data.Map.Merge.Strict
+  import Data.Text.Encoding
   import UnliftIO.IORef
 
   import GHC.Exts (Item, toList)
+
+  import Data.ByteString.Builder.Prim (BoundedPrim, (>$<), (>*<))
+
+  import qualified Data.ByteString.Builder.Prim as P
 
 
   -- |
@@ -133,14 +138,14 @@ where
   -- |
   -- Convert 'HtmlT' to a 'Builder'.
   --
-  fromHtmlT :: (Monad m, MonadIO m) => HtmlT m a -> m Builder
+  fromHtmlT :: (MonadIO m) => HtmlT m a -> m Builder
   fromHtmlT = fmap snd . runHtmlT
 
 
   -- |
   -- Add a tag with opening and closing mark, possibly holding children.
   --
-  tag :: (Monad m, MonadIO m)
+  tag :: (MonadIO m)
       => Text                -- ^ Tag name
       -> Text                -- ^ Classes
       -> HtmlT m a           -- ^ Children
@@ -151,7 +156,8 @@ where
     envInner <- newIORef mempty
 
     unless (classes == "") do
-      modifyIORef' envAttrs (<> fromList ["class" .= classes])
+      modifyIORef envAttrs \(Attributes am) ->
+        Attributes (insert "class" classes am)
 
     res <- lift (runReaderT stack Env{..})
 
@@ -161,7 +167,7 @@ where
 
     return res
 
-  {-# INLINE tag #-}
+  {-# NOINLINE tag #-}
 
 
   -- |
@@ -177,7 +183,7 @@ where
        then emitUnclosed name (fromList $ ("class", classes) : attrs)
        else emitUnclosed name (fromList attrs)
 
-  {-# INLINE tag' #-}
+  {-# NOINLINE tag' #-}
 
 
   -- |
@@ -189,7 +195,7 @@ where
   attr :: (MonadIO m) => [(Text, Text)] -> HtmlT m ()
   attr attrs = HtmlT do
     Env{envAttrs} <- ask
-    modifyIORef' envAttrs (<> fromList attrs)
+    modifyIORef envAttrs (<> fromList attrs)
 
   {-# INLINE attr #-}
 
@@ -223,8 +229,10 @@ where
     Env{envRich, envInner} <- ask
 
     if envRich
-       then modifyIORef' envInner (<> fromHtmlEscapedText t)
-       else modifyIORef' envInner (<> fromText t)
+       then modifyIORef envInner (<> escaped t)
+       else modifyIORef envInner (<> raw t)
+
+  {-# INLINE emitEscaped #-}
 
 
   emitHtml :: (MonadIO m) => Builder -> ReaderT Env m ()
@@ -232,42 +240,66 @@ where
     Env{envRich, envInner} <- ask
 
     when envRich do
-      modifyIORef' envInner (<> builder)
+      modifyIORef envInner (<> builder)
+
+  {-# INLINE emitHtml #-}
 
 
   emitRaw :: (MonadIO m) => Text -> ReaderT Env m ()
-  emitRaw = emitHtml . fromText
+  emitRaw = emitHtml . raw
+  {-# INLINE emitRaw #-}
 
 
   emitTag :: (MonadIO m) => Text -> Attributes -> Builder -> ReaderT Env m ()
   emitTag name attrs inner = do
-    emitHtml $ mconcat [ "<"
-                       , fromText name
-                       , foldMap buildAttr (toList attrs)
-                       , ">"
-                       , inner
-                       , "</"
-                       , fromText name
-                       , ">"
-                       ]
+    let attrs' = foldMap buildAttr (toList attrs)
+    emitHtml $ "<" <> raw name <> attrs' <> ">" <> inner <> "</" <> raw name <> ">"
+
+  {-# INLINE emitTag #-}
 
 
   emitUnclosed :: (MonadIO m) => Text -> Attributes -> ReaderT Env m ()
   emitUnclosed name attrs = do
-    emitHtml $ mconcat [ "<"
-                       , fromText name
-                       , foldMap buildAttr (toList attrs)
-                       , ">"
-                       ]
+    emitHtml $ "<" <> raw name <> foldMap buildAttr (toList attrs) <> ">"
+
+  {-# INLINE emitUnclosed #-}
 
 
   buildAttr :: (Text, Text) -> Builder
-  buildAttr (key, value) = mconcat [ " "
-                                   , fromText key
-                                   , "=\""
-                                   , fromHtmlEscapedText value
-                                   , "\""
-                                   ]
+  buildAttr (key, value) = " " <> raw key <> "=\"" <> escaped value <> "\""
+  {-# INLINE buildAttr #-}
+
+
+  raw :: Text -> Builder
+  raw = {-# SCC raw #-} encodeUtf8Builder
+  {-# INLINE raw #-}
+
+
+  escaped :: Text -> Builder
+  escaped = {-# SCC escaped #-} encodeUtf8BuilderEscaped escape
+  {-# INLINE escaped #-}
+
+
+  escape :: BoundedPrim Word8
+  escape =
+    P.condB (>= 63) (P.liftFixedToBounded P.word8) $
+      P.condB (== 60) (fixed4 (38, (108, (116, 59)))) $                       -- &lt;
+        P.condB (== 62) (fixed4 (38, (103, (116, 59)))) $                     -- &gt;
+          P.condB (== 38) (fixed5 (38, (97, (109, (112, 59))))) $             -- &amp;
+            P.condB (== 34) (fixed6 (38, (113, (117, (111, (116, 59)))))) $   -- &quot;
+              P.condB (== 39) (fixed6 (38, (97, (112, (111, (115, 59)))))) $  -- &apos;
+                P.liftFixedToBounded P.word8
+    where
+      fixed4 x = P.liftFixedToBounded $ const x >$<
+        P.word8 >*< P.word8 >*< P.word8 >*< P.word8
+
+      fixed5 x = P.liftFixedToBounded $ const x >$<
+        P.word8 >*< P.word8 >*< P.word8 >*< P.word8 >*< P.word8
+
+      fixed6 x = P.liftFixedToBounded $ const x >$<
+        P.word8 >*< P.word8 >*< P.word8 >*< P.word8 >*< P.word8 >*< P.word8
+
+  {-# INLINE escape #-}
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

@@ -71,7 +71,7 @@ where
   import Hikaru.HTML
   import Hikaru.Media
 
-  import Blaze.ByteString.Builder (toByteString)
+  import Data.ByteString.Builder (toLazyByteString)
 
   import Data.List (filter, map, sortOn, reverse)
 
@@ -143,7 +143,7 @@ where
   localizeText :: (MonadIO m, Localizable l) => Text -> l -> m Text
   localizeText lang msg = do
     res <- plainHtmlT $ localize lang msg
-    return $ cs $ toByteString res
+    return $ cs $ toLazyByteString res
 
   {-# INLINE localizeText #-}
 
