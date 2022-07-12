@@ -40,7 +40,7 @@ module Hikaru.HTML
   , doctype
   )
 where
-  import Praha hiding (toList)
+  import Crude.Prelude hiding (toList)
 
   import Data.ByteString.Builder
   import Data.Map (insert)

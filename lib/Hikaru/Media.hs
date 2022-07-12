@@ -25,7 +25,7 @@ module Hikaru.Media
   , selectMedia
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Data.Attoparsec.Text
   import Data.Char

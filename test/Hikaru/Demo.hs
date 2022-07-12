@@ -12,7 +12,7 @@ module Hikaru.Demo
   ( makeDemo
   )
 where
-  import Praha hiding (for_)
+  import Crude.Prelude
 
   import Hikaru
 

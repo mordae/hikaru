@@ -20,7 +20,7 @@ module Hikaru.Link
   , isActiveRoute
   )
 where
-  import Praha hiding (curry)
+  import Crude.Prelude hiding (curry)
 
   import Hikaru.Action
   import Hikaru.HTML

@@ -14,7 +14,7 @@ module Hikaru.DemoSpec
   ( spec
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Hikaru.Demo
   import Hikaru.Test

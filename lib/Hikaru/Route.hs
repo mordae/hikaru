@@ -55,7 +55,7 @@ module Hikaru.Route
   , routeVary
   )
 where
-  import Praha hiding (curry)
+  import Crude.Prelude hiding (curry)
 
   import Hikaru.Media
   import Hikaru.Types

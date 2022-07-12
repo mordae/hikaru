@@ -65,7 +65,7 @@ module Hikaru.Localize
   , selectLanguage
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Hikaru.Action
   import Hikaru.HTML

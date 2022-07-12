@@ -32,7 +32,7 @@ module Hikaru.Dispatch
   , makeChokingMiddleware
   )
 where
-  import Praha hiding (curry)
+  import Crude.Prelude hiding (curry)
 
   import Hikaru.Action hiding (respond)
   import Hikaru.Route

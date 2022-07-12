@@ -13,7 +13,7 @@ module Hikaru.Types
   , Severity(..)
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import qualified Data.ByteString
   import qualified Data.ByteString.Lazy

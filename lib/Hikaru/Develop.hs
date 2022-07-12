@@ -14,7 +14,7 @@ module Hikaru.Develop
   ( developWith
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import UnliftIO.MVar
 

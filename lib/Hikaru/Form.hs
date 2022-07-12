@@ -77,7 +77,7 @@ module Hikaru.Form
   , addAlert
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Hikaru.Types
   import Hikaru.Action

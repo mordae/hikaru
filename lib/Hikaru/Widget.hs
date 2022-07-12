@@ -17,7 +17,7 @@ module Hikaru.Widget
   , RenderWidget(..)
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Hikaru.HTML
 

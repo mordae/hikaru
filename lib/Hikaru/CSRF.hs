@@ -15,8 +15,8 @@ module Hikaru.CSRF
   , isTokenValid
   )
 where
-  import Praha
-  import Praha.Config.Environment
+  import Crude.Prelude
+  import Crude.Config.Environment
 
   import Hikaru.Action
 

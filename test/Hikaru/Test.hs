@@ -21,7 +21,7 @@ module Hikaru.Test
   , module Test.Hspec
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import qualified Data.ByteString.Lazy as LBS
 

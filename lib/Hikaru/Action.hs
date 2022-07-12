@@ -116,7 +116,7 @@ module Hikaru.Action
   , FilePath
   )
 where
-  import Praha
+  import Crude.Prelude
 
   import Hikaru.HTML (fromHtmlT, HtmlT)
   import Hikaru.Media
