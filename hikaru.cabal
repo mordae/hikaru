@@ -131,3 +131,28 @@ test-suite spec
         wai-extra >=3.0,
         wai-websockets >=3.0,
         websockets >=0.12
+
+benchmark bench
+    type:               exitcode-stdio-1.0
+    main-is:            Bench.hs
+    hs-source-dirs:     test
+    default-language:   GHC2021
+    default-extensions:
+        AllowAmbiguousTypes BlockArguments DataKinds DefaultSignatures
+        DuplicateRecordFields GeneralizedNewtypeDeriving LambdaCase
+        NoImplicitPrelude OverloadedStrings RecordWildCards TypeFamilies
+        UndecidableInstances DisambiguateRecordFields NoFieldSelectors
+        OverloadedRecordDot
+
+    ghc-options:
+        -Wall -Wcompat -Wincomplete-uni-patterns -Wpartial-fields
+        -Wincomplete-record-updates -Widentities -Wredundant-constraints
+        -threaded -rtsopts -with-rtsopts=-N
+
+    build-depends:
+        hikaru,
+        criterion,
+        crude-prelude,
+        http-media,
+        bytestring,
+        lucid
