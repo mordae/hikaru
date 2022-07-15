@@ -58,7 +58,6 @@ library
 
     build-depends:
         aeson >=1.4,
-        attoparsec >=0.13,
         base >=4.13 && <5,
         binary >=0.8,
         bytestring >=0.10,
@@ -73,6 +72,7 @@ library
         crude-prelude >=0.1,
         crude-config >=0.1,
         resourcet >=1.2,
+        snack >=0.4,
         text >=2.0,
         time >=1.9,
         unliftio >=0.2,
@@ -109,7 +109,6 @@ test-suite spec
 
     build-depends:
         aeson >=1.4,
-        attoparsec >=0.13,
         base >=4.13 && <5,
         binary >=0.8,
         bytestring >=0.10,

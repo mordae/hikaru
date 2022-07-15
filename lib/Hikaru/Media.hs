@@ -27,9 +27,8 @@ module Hikaru.Media
 where
   import Crude.Prelude
 
-  import Data.Attoparsec.Text
-  import Data.Char
-  import Data.List (filter, lookup, sortOn)
+  import Data.Text.Parser
+  import Data.List (filter, sortOn)
 
 
   -- |
@@ -78,58 +77,63 @@ where
   -- Parser for the media list coded mostly to the RFC 2045.
   --
   pMediaList :: Parser [Media]
-  pMediaList = pMedia `sepBy` pSeparator
+  pMediaList = skipSpace *> (pMedia `sepBy` pSeparator)
     where
       pMedia :: Parser Media
       pMedia = do
         mainType <- pToken
-        subType  <- (char '/' *> pToken) <|> string ""
-        params   <- many' pParameter
+        subType  <- (char '/' *> pToken) <|> pure ""
 
-        let quality = fromMaybe 1.0 do
-                        q <- lookup "q" params
-                        readMaybe (cs q)
+        (qs, params) <- partitionEithers <$> many (eitherP pQuality pParameter)
+
+        let quality = fromMaybe 1.0 . listToMaybe $ qs
 
         return Media{..}
 
       pParameter :: Parser (Text, Text)
       pParameter = do
-        _     <- skipSpace *> char ';'
+        _     <- char ';' <* skipSpace
         name  <- pToken
-        _     <- char '='
+        _     <- char '=' <* skipSpace
         value <- pValue
         return (name, value)
 
+      pQuality :: Parser Float
+      pQuality = do
+        _ <- char ';' <* skipSpace
+        _ <- char 'q' <* skipSpace
+        _ <- char '=' <* skipSpace
+        fractional
+
       pToken :: Parser Text
-      pToken = pSpaced $ takeTill isSpecial
+      pToken = label "token" $ takeTill1 isSpecial <* skipSpace
 
       pSeparator :: Parser Char
-      pSeparator = pSpaced $ char ','
+      pSeparator = char ',' <* skipSpace
 
       pValue :: Parser Text
-      pValue = pToken <|> pQuotedStr
+      pValue = branch [ (char '"', \_ -> pQuotedStr)
+                         , (   pure ' ', \_ -> pToken)
+                         ]
 
       pQuotedStr :: Parser Text
-      pQuotedStr = pSpaced $ pQuoted $ takeWhile isStrChar
+      pQuotedStr = pString <* char '"' <* skipSpace
 
-      pSpaced :: Parser a -> Parser a
-      pSpaced p = skipSpace *> p <* skipSpace
-
-      pQuoted :: Parser a -> Parser a
-      pQuoted p = char '"' *> p <* char '"'
+      pString :: Parser Text
+      pString = label "string" $ takeWhile isStrChar
 
       isStrChar :: (Char -> Bool)
       isStrChar c = c /= '\\' && c /= '"'
 
       isSpecial :: (Char -> Bool)
-      isSpecial c = isControl c || isSpace c
-                    || c == '(' || c == ')'
-                    || c == '<' || c == '>'
-                    || c == '@' || c == ',' || c == ';'
-                    || c == ':' || c == '\\'
-                    || c == '"' || c == '/'
-                    || c == '[' || c == ']'
-                    || c == '?' || c == '='
+      isSpecial c = c <= ' '
+                 || c == '(' || c == ')'
+                 || c == '<' || c == '>'
+                 || c == '@' || c == ',' || c == ';'
+                 || c == ':' || c == '\\'
+                 || c == '"' || c == '/'
+                 || c == '[' || c == ']'
+                 || c == '?' || c == '='
 
 
   -- |
