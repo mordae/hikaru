@@ -57,7 +57,7 @@
 --
 
 module Hikaru.Localize
-  ( Locale
+  ( Language
   , Localizable(..)
   , localize'
   , localizeText
@@ -70,18 +70,11 @@ where
   import Hikaru.Action
   import Hikaru.HTML
   import Hikaru.Media
+  import Hikaru.Types
 
   import Data.ByteString.Builder (toLazyByteString)
 
   import Data.List (filter, map, sortOn, reverse)
-
-
-  -- |
-  -- Name of the target locale.
-  --
-  -- Usually an ISO 639-1 Alpha-2 code such as @en@ or @cs@.
-  --
-  type Locale = Text
 
 
   -- |
@@ -91,7 +84,7 @@ where
     -- |
     -- Localize the message using given locale.
     --
-    localize :: (MonadIO m) => Locale -> l -> HtmlT m ()
+    localize :: (MonadIO m) => Language -> l -> HtmlT m ()
     localize _lang msg = text (tshow msg)
     {-# INLINE localize #-}
 
@@ -140,7 +133,7 @@ where
   -- Localize the message using given locale and convert it
   -- to 'Text' using 'plainHtmlT'.
   --
-  localizeText :: (MonadIO m, Localizable l) => Text -> l -> m Text
+  localizeText :: (MonadIO m, Localizable l) => Language -> l -> m Text
   localizeText lang msg = do
     res <- plainHtmlT $ localize lang msg
     return $ cs $ toLazyByteString res
@@ -155,7 +148,7 @@ where
   -- If the parameter is present, also set the cookie so that the
   -- language preference persists across multiple page loads.
   --
-  selectLanguage :: (MonadAction m) => Text -> Text -> Text -> m ()
+  selectLanguage :: (MonadAction m) => Text -> Text -> Language -> m ()
   selectLanguage paramName cookieName fallback = do
     preferred <- getParamMaybe paramName
     previous  <- getCookieMaybe cookieName
@@ -168,7 +161,7 @@ where
     setLanguage $ fromMaybe fallback $ preferred <|> previous <|> listToMaybe acceptable
 
 
-  bestLanguage :: [Media] -> [Text]
+  bestLanguage :: [Media] -> [Language]
   bestLanguage = map (.mainType)
                . reverse
                . sortOn (.quality)

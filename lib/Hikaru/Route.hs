@@ -387,7 +387,7 @@ where
   acceptContent media = Appraisal {vary = ["Content-Type"], score}
     where
       score req = do
-        case parseMedia (cs $ getContentType req) of
+        case parseMedia (getContentType req) of
           Left _reason -> BadRequest "Failed to parse Content-Type."
           Right header -> case selectMedia media header of
                             Just Media{..} -> Suitable quality
@@ -445,7 +445,7 @@ where
   offerContent media = Appraisal {vary = ["Accept"], score}
     where
       score req = do
-        case parseMedia (cs $ getAccept req) of
+        case parseMedia (getAccept req) of
           Left _reason -> BadRequest "Failed to parse Accept."
           Right header -> case selectMedia media header of
                             Just Media{..} -> Suitable quality
@@ -498,7 +498,7 @@ where
   offerEncoding media = Appraisal {vary = ["Accept-Encoding"], score}
     where
       score req = do
-        case parseMedia (cs $ getAcceptEncoding req) of
+        case parseMedia (getAcceptEncoding req) of
           Left _reason -> BadRequest "Failed to parse Accept-Encoding."
           Right header -> case selectMedia media header of
                             Just Media{..} -> Suitable quality
@@ -515,7 +515,7 @@ where
   offerLanguage media = Appraisal {vary = ["Accept-Language"], score}
     where
       score req = do
-        case parseMedia (cs $ getAcceptLanguage req) of
+        case parseMedia (getAcceptLanguage req) of
           Left _reason -> BadRequest "Failed to parse Accept-Language."
           Right header -> case selectMedia media header of
                             Just Media{..} -> Suitable quality

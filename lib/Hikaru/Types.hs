@@ -11,6 +11,7 @@
 module Hikaru.Types
   ( Param(..)
   , Severity(..)
+  , Language
   )
 where
   import Crude.Prelude
@@ -235,6 +236,14 @@ where
   --
   instance Monoid Severity where
     mempty = Success
+
+
+  -- |
+  -- Name of a locale.
+  --
+  -- Usually an ISO 639-1 Alpha-2 code such as @en@ or @cs@.
+  --
+  type Language = ByteString
 
 
 -- vim:set ft=haskell sw=2 ts=2 et:

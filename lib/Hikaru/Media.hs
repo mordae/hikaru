@@ -27,7 +27,7 @@ module Hikaru.Media
 where
   import Crude.Prelude
 
-  import Data.Text.Parser
+  import Data.ByteString.Parser.Char8
   import Data.List (filter, sortOn)
 
 
@@ -39,9 +39,9 @@ where
   --
   data Media
     = Media
-      { mainType       :: Text
-      , subType        :: Text
-      , params         :: [(Text, Text)]
+      { mainType       :: ByteString
+      , subType        :: ByteString
+      , params         :: [(ByteString, ByteString)]
       , quality        :: Float
       }
     deriving (Show, Eq, Ord, Generic)
@@ -69,7 +69,7 @@ where
   -- , Media { mainType = "text", subType = "plain", quality = 0.7, params = [] }
   -- ]
   --
-  parseMedia :: Text -> Either String [Media]
+  parseMedia :: ByteString -> Either String [Media]
   parseMedia = parseOnly (pMediaList <* endOfInput)
 
 
@@ -90,7 +90,7 @@ where
 
         return Media{..}
 
-      pParameter :: Parser (Text, Text)
+      pParameter :: Parser (ByteString, ByteString)
       pParameter = do
         _     <- char ';' <* skipSpace
         name  <- pToken
@@ -105,21 +105,21 @@ where
         _ <- char '=' <* skipSpace
         fractional
 
-      pToken :: Parser Text
+      pToken :: Parser ByteString
       pToken = label "token" $ takeTill1 isSpecial <* skipSpace
 
       pSeparator :: Parser Char
       pSeparator = char ',' <* skipSpace
 
-      pValue :: Parser Text
+      pValue :: Parser ByteString
       pValue = branch [ (char '"', \_ -> pQuotedStr)
                          , (   pure ' ', \_ -> pToken)
                          ]
 
-      pQuotedStr :: Parser Text
+      pQuotedStr :: Parser ByteString
       pQuotedStr = pString <* char '"' <* skipSpace
 
-      pString :: Parser Text
+      pString :: Parser ByteString
       pString = label "string" $ takeWhile isStrChar
 
       isStrChar :: (Char -> Bool)

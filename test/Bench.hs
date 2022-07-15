@@ -50,7 +50,7 @@ where
     ]
 
 
-  benchHikaruMedia :: Text -> Either String [Hikaru.Media]
+  benchHikaruMedia :: ByteString -> Either String [Hikaru.Media]
   benchHikaruMedia media = Hikaru.parseMedia media
 
 

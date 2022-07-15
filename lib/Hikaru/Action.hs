@@ -268,7 +268,7 @@ where
       , aeFinalize     :: !(IORef (IO ()))
       , aeBodyLimit    :: !(IORef Int64)
       , aeBodyCounter  :: !(IORef Int64)
-      , aeLanguage     :: !(IORef Text)
+      , aeLanguage     :: !(IORef Language)
       , aeCache        :: !(IORef (Map.Map Text Dynamic))
       , aeMsgLimit     :: !(IORef Int64)
       , aeFrameLimit   :: !(IORef Int64)
@@ -429,7 +429,7 @@ where
   getAccept = do
     value <- getHeaderDefault hAccept "*/*"
 
-    case parseMedia (cs value) of
+    case parseMedia value of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept."
       Right media  -> return media
 
@@ -445,7 +445,7 @@ where
   getAcceptCharset = do
     value <- getHeaderDefault hAcceptCharset "*"
 
-    case parseMedia (cs value) of
+    case parseMedia value of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Charset."
       Right media  -> return media
 
@@ -462,7 +462,7 @@ where
   getAcceptEncoding = do
     value <- getHeaderDefault hAcceptEncoding "identity,*;q=0"
 
-    case parseMedia (cs value) of
+    case parseMedia value of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Encoding."
       Right media  -> return media
 
@@ -478,7 +478,7 @@ where
   getAcceptLanguage = do
     value <- getHeaderDefault hAcceptLanguage "*"
 
-    case parseMedia (cs value) of
+    case parseMedia value of
       Left _reason -> abort badRequest400 [] "Failed to parse Accept-Language."
       Right media  -> return media
 
@@ -495,7 +495,7 @@ where
   getContentType = do
     value <- getHeaderDefault hContentType "application/octet-stream"
 
-    case parseMedia (cs value) of
+    case parseMedia value of
       Left _reason -> abort badRequest400 [] "Failed to parse Content-Type."
       Right []     -> abort badRequest400 [] "Empty Content-Type."
       Right (m:_)  -> return m
@@ -540,6 +540,7 @@ where
 
   {-# INLINE getParamMaybe #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe ByteString) #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getParamMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
@@ -553,6 +554,7 @@ where
   getParamDefault n v = fromMaybe v <$> getParamMaybe n
   {-# INLINE getParamDefault #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> ByteString -> m ByteString #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getParamDefault :: (MonadAction m) => Text -> Int -> m Int #-}
@@ -569,6 +571,7 @@ where
 
   {-# INLINE getParamList #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Text] #-}
+  {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [ByteString] #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int32] #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int64] #-}
   {-# SPECIALIZE getParamList :: (MonadAction m) => Text -> m [Int] #-}
@@ -599,6 +602,7 @@ where
 
   {-# INLINE getCookieMaybe #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe ByteString) #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getCookieMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
@@ -612,6 +616,7 @@ where
   getCookieDefault n v = fromMaybe v <$> getCookieMaybe n
   {-# INLINE getCookieDefault #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> ByteString -> m ByteString #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getCookieDefault :: (MonadAction m) => Text -> Int -> m Int #-}
@@ -868,6 +873,7 @@ where
 
   {-# INLINE getFieldMaybe #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Text) #-}
+  {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe ByteString) #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int32) #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int64) #-}
   {-# SPECIALIZE getFieldMaybe :: (MonadAction m) => Text -> m (Maybe Int) #-}
@@ -881,6 +887,7 @@ where
   getFieldDefault n v = fromMaybe v <$> getFieldMaybe n
   {-# INLINE getFieldDefault #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Text -> m Text #-}
+  {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> ByteString -> m ByteString #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int32 -> m Int32 #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int64 -> m Int64 #-}
   {-# SPECIALIZE getFieldDefault :: (MonadAction m) => Text -> Int -> m Int #-}
@@ -897,6 +904,10 @@ where
 
   {-# INLINE getFieldList #-}
   {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [Text] #-}
+  {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [ByteString] #-}
+  {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [Int32] #-}
+  {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [Int64] #-}
+  {-# SPECIALIZE getFieldList :: (MonadAction m) => Text -> m [Int] #-}
 
 
   -- |
@@ -1100,10 +1111,10 @@ where
   -- is closed, can be accessed from JavaScript and can not be sent with
   -- cross-site requests.
   --
-  setCookie :: (MonadAction m) => Text -> Text -> m ()
+  setCookie :: (MonadAction m, Param a) => Text -> a -> m ()
   setCookie name value = do
     setCookieEx $ defaultSetCookie { setCookieName     = cs name
-                                   , setCookieValue    = cs value
+                                   , setCookieValue    = cs (toParam value)
                                    , setCookiePath     = Just "/"
                                    , setCookieSameSite = Just sameSiteLax
                                    }
@@ -1457,7 +1468,7 @@ where
   -- Language must be set using the 'setLanguage' function or through
   -- the localization tools found in the "Hikaru.Localize" module.
   --
-  getLanguage :: (MonadAction m) => m Text
+  getLanguage :: (MonadAction m) => m Language
   getLanguage = getActionField (.aeLanguage)
   {-# INLINE getLanguage #-}
 
@@ -1467,7 +1478,7 @@ where
   --
   -- See 'getLanguage' above for more information.
   --
-  setLanguage :: (MonadAction m) => Text -> m ()
+  setLanguage :: (MonadAction m) => Language -> m ()
   setLanguage = setActionField (.aeLanguage)
   {-# INLINE setLanguage #-}
 
